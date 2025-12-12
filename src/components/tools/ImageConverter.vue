@@ -361,44 +361,42 @@ const closePreview = () => {
           <Settings2 class="h-4 w-4" />
           輸出格式
         </div>
-        
-        <div class="space-y-3">
-          <div class="grid grid-cols-2 lg:grid-cols-3 gap-2">
-            <button
-              v-for="format in CONFIG.OUTPUT_FORMATS"
-              :key="format.value"
-              @click="selectedFormat = format.value; reconvertAll()"
-              :class="[
-                'relative flex flex-col items-start p-3 rounded-lg border-2 transition-all text-left',
-                selectedFormat === format.value
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border hover:border-primary/50'
-              ]"
-            >
-              <div class="flex items-center gap-2">
-                <span class="font-semibold text-foreground">{{ format.label }}</span>
-                <span 
-                  v-if="format.recommended" 
-                  class="text-[10px] px-1.5 py-0.5 rounded-full bg-chart-4/20 text-chart-4 font-medium"
-                >
-                  推薦
-                </span>
-              </div>
-              <span class="text-xs text-muted-foreground mt-1">{{ format.description }}</span>
-              <div 
-                v-if="selectedFormat === format.value"
-                class="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center"
+
+        <div class="grid grid-cols-2 lg:grid-cols-3 gap-2">
+          <button
+            v-for="format in CONFIG.OUTPUT_FORMATS"
+            :key="format.value"
+            @click="selectedFormat = format.value; reconvertAll()"
+            :class="[
+              'relative flex flex-col items-start p-3 rounded-lg border-2 transition-all text-left',
+              selectedFormat === format.value
+                ? 'border-primary bg-primary/5'
+                : 'border-border hover:border-primary/50'
+            ]"
+          >
+            <div class="flex items-center gap-2">
+              <span class="font-semibold text-foreground">{{ format.label }}</span>
+              <span 
+                v-if="format.recommended" 
+                class="text-[10px] px-1.5 py-0.5 rounded-full bg-chart-4/20 text-chart-4 font-medium"
               >
-                <Check class="h-3 w-3 text-white" />
-              </div>
-            </button>
-          </div>
+                推薦
+              </span>
+            </div>
+            <span class="text-xs text-muted-foreground/80 mt-1">{{ format.description }}</span>
+            <div 
+              v-if="selectedFormat === format.value"
+              class="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center"
+            >
+              <Check class="h-3 w-3 text-white" />
+            </div>
+          </button>
         </div>
       </Card>
   
       <Card class="p-4 space-y-4 md:flex-1">
         <div class="flex justify-between">
-          <div class="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-3">
+          <div class="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-0">
             <FileCode class="h-4 w-4" />
             壓縮設定
           </div>
@@ -416,34 +414,29 @@ const closePreview = () => {
         </div>
   
         <!-- Compression Settings -->
-        <div class="space-y-3">
-          
-          
-          <div class="space-y-2">
-            <div class="flex items-center justify-between text-sm">
-              <span class="text-muted-foreground">品質</span>
-              <span class="font-mono font-medium text-foreground">{{ qualityPercent }}%</span>
-            </div>
-            <input
-              type="range"
-              min="0.1"
-              max="1"
-              step="0.05"
-              v-model.number="quality"
-              @change="reconvertAll()"
-              :disabled="!enableCompress"
-              class="quality-slider w-full"
-            />
-            <div class="flex justify-between text-xs text-muted-foreground">
-              <span>檔案較小</span>
-              <span>品質優先</span>
-            </div>
+ 
+          <div class="flex items-center justify-between text-sm mb-0">
+            <span class="text-muted-foreground">品質</span>
+            <span class="font-mono font-medium text-foreground">{{ qualityPercent }}%</span>
+          </div>
+          <input
+            type="range"
+            min="0.1"
+            max="1"
+            step="0.05"
+            v-model.number="quality"
+            @change="reconvertAll()"
+            :disabled="!enableCompress"
+            class="quality-slider w-full"
+          />
+          <div class="flex justify-between text-muted-foreground/60 text-xs text-muted-foreground">
+            <span>檔案較小</span>
+            <span>品質優先</span>
           </div>
           
           <!-- <p class="text-xs text-muted-foreground bg-secondary/50 rounded-lg p-2">
             {{ enableCompress ? '有損壓縮可大幅減少檔案大小，但可能略微降低畫質' : 'PNG 格式無損，其他格式將使用最高品質' }}
           </p> -->
-        </div>
       </Card>
     </div>
 
@@ -484,7 +477,7 @@ const closePreview = () => {
           v-if="doneCount > 0" 
           @click="downloadAll"
           :disabled="isDownloadingAll"
-          class="flex-1 sm:flex-none gap-2 bg-chart-2 text-white hover:bg-chart-2/90"
+          class="flex-1 sm:flex-none gap-2 bg-primary text-white hover:bg-primary/90"
         >
           <RefreshCw v-if="isDownloadingAll" class="h-4 w-4 animate-spin" />
           <Download v-else class="h-4 w-4" />
@@ -661,12 +654,3 @@ const closePreview = () => {
     </Teleport>
   </div>
 </template>
-
-<style scoped>
-/* 共用樣式已移至 @/styles/components.css */
-/* .custom-checkbox, .quality-slider, .modal-* 等樣式現在是全域的 */
-
-button {
-  cursor: pointer;
-}
-</style>
