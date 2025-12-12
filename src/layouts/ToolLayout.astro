@@ -1,0 +1,58 @@
+---
+/**
+ * 工具頁面共用版面
+ * 包含頁面載入器、Header、Theme Switcher
+ */
+import Layout from '@/layouts/Layout.astro';
+import PageLoader from '@/components/ui/PageLoader.vue';
+import ThemeSwitcher from '@/components/ThemeSwitcher.vue';
+import { ArrowLeft } from 'lucide-vue-next';
+
+interface Props {
+  /** 頁面標題 */
+  title: string;
+  /** SEO 標題 (顯示在瀏覽器分頁) */
+  seoTitle?: string;
+}
+
+const { title, seoTitle } = Astro.props;
+const fullSeoTitle = seoTitle || `${title} | DevBox`;
+---
+
+<Layout title={fullSeoTitle}>
+  <!-- Pure HTML/CSS Loader - Shows immediately -->
+  <div id="page-loader" class="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-background">
+    <div class="page-loader-spinner"></div>
+    <p class="text-sm text-muted-foreground">載入中...</p>
+  </div>
+  
+  <!-- Vue component to handle removal -->
+  <PageLoader client:only="vue" />
+  
+  <div class="min-h-screen bg-background pb-20">
+    <!-- Header -->
+    <header class="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
+      <div class="container mx-auto flex h-14 items-center justify-between px-4">
+        <div class="flex items-center gap-4">
+          <a href="/" class="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-accent transition-colors">
+            <ArrowLeft class="h-4 w-4 text-muted-foreground" />
+          </a>
+          <h1 class="text-base font-semibold text-foreground">{title}</h1>
+        </div>
+        
+        <!-- Theme Switcher -->
+        <ThemeSwitcher client:load />
+      </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-8">
+      <div class="mx-auto max-w-6xl">
+        <!-- Tool Content -->
+        <slot />
+        
+        <!-- Footer Note (可選) -->
+        <slot name="footer" />
+      </div>
+    </main>
+  </div>
+</Layout>

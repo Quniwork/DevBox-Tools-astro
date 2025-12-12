@@ -1,0 +1,161 @@
+{
+  "colour": {
+    "surface": {
+      "bg-primary": {
+        "$type": "color",
+        "$value": {
+          "colorSpace": "srgb",
+          "components": [
+            0.9607843160629272,
+            0.9215686321258545,
+            0.929411768913269
+          ],
+          "alpha": 1,
+          "hex": "#F5EBED"
+        },
+        "$extensions": {
+          "com.figma.variableId": "VariableID:84:1685",
+          "com.figma.scopes": [
+            "ALL_SCOPES"
+          ],
+          "com.figma.aliasData": {
+            "targetVariableId": "VariableID:4003:179",
+            "targetVariableName": "colour/4/bg-primary",
+            "targetVariableSetId": "VariableCollectionId:7:40",
+            "targetVariableSetName": "Primitives"
+          }
+        }
+      },
+      "bg-secondary": {
+        "$type": "color",
+        "$value": {
+          "colorSpace": "srgb",
+          "components": [
+            0.9803921580314636,
+            0.8509804010391235,
+            0.8745098114013672
+          ],
+          "alpha": 1,
+          "hex": "#FAD9DF"
+        },
+        "$extensions": {
+          "com.figma.variableId": "VariableID:2047:120",
+          "com.figma.scopes": [
+            "ALL_SCOPES"
+          ],
+          "com.figma.aliasData": {
+            "targetVariableId": "VariableID:4003:180",
+            "targetVariableName": "colour/4/bg-secondary",
+            "targetVariableSetId": "VariableCollectionId:7:40",
+            "targetVariableSetName": "Primitives"
+          }
+        }
+      },
+      "bg-tertiary": {
+        "$type": "color",
+        "$value": {
+          "colorSpace": "srgb",
+          "components": [
+            0.8784313797950745,
+            0.5764706134796143,
+            0.6235294342041016
+          ],
+          "alpha": 1,
+          "hex": "#E0939F"
+        },
+        "$extensions": {
+          "com.figma.variableId": "VariableID:2047:121",
+          "com.figma.scopes": [
+            "ALL_SCOPES"
+          ],
+          "com.figma.aliasData": {
+            "targetVariableId": "VariableID:4003:181",
+            "targetVariableName": "colour/4/bg-tertiary",
+            "targetVariableSetId": "VariableCollectionId:7:40",
+            "targetVariableSetName": "Primitives"
+          }
+        }
+      },
+      "text-primary": {
+        "$type": "color",
+        "$value": {
+          "colorSpace": "srgb",
+          "components": [
+            0.5058823823928833,
+            0.25882354378700256,
+            0.3176470696926117
+          ],
+          "alpha": 1,
+          "hex": "#814251"
+        },
+        "$extensions": {
+          "com.figma.variableId": "VariableID:103:7005",
+          "com.figma.scopes": [
+            "ALL_SCOPES"
+          ],
+          "com.figma.aliasData": {
+            "targetVariableId": "VariableID:6004:47573",
+            "targetVariableName": "colour/4/text-primary",
+            "targetVariableSetId": "VariableCollectionId:7:40",
+            "targetVariableSetName": "Primitives"
+          }
+        }
+      },
+      "text-secondary": {
+        "$type": "color",
+        "$value": {
+          "colorSpace": "srgb",
+          "components": [
+            0.7058823704719543,
+            0.2980392277240753,
+            0.6235294342041016
+          ],
+          "alpha": 1,
+          "hex": "#B44C9F"
+        },
+        "$extensions": {
+          "com.figma.variableId": "VariableID:84:1689",
+          "com.figma.scopes": [
+            "ALL_SCOPES"
+          ],
+          "com.figma.aliasData": {
+            "targetVariableId": "VariableID:6004:47574",
+            "targetVariableName": "colour/4/text-secondary",
+            "targetVariableSetId": "VariableCollectionId:7:40",
+            "targetVariableSetName": "Primitives"
+          }
+        }
+      }
+    },
+    "common": {
+      "text-tertiary": {
+        "$type": "color",
+        "$value": {
+          "colorSpace": "srgb",
+          "components": [
+            0,
+            0,
+            0
+          ],
+          "alpha": 1,
+          "hex": "#000000"
+        },
+        "$extensions": {
+          "com.figma.variableId": "VariableID:6365:2",
+          "com.figma.scopes": [
+            "ALL_SCOPES"
+          ],
+          "com.figma.aliasData": {
+            "targetVariableId": "VariableID:24:14015",
+            "targetVariableName": "colour/neutral/black",
+            "targetVariableSetId": "VariableCollectionId:7:40",
+            "targetVariableSetName": "Primitives"
+          }
+        }
+      }
+    }
+  },
+  "$extensions": {
+    "com.figma.modeName": "4"
+  }
+}

@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code 工具 - 解碼 & 產生器</title>
+    <meta name="description" content="QR Code 工具：上傳解碼或產生 SVG 格式 QR Code">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-svg@1.1.0/lib/qrcode.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Noto Sans TC', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0f0fe',
+                            500: '#60a5fa',
+                            600: '#3b82f6',
+                        }
+                    },
+                    boxShadow: {
+                        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
+                        'glow': '0 0 40px rgba(59, 130, 246, 0.3)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        html { scrollbar-gutter: stable; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background-color: #e2e8f0; border-radius: 20px; }
+        .dark ::-webkit-scrollbar-thumb { background-color: #475569; }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        .drop-zone {
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        .drop-zone::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 1rem;
+            padding: 2px;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6, #ec4899);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .drop-zone.dragover::before,
+        .drop-zone:hover::before {
+            opacity: 1;
+        }
+        .drop-zone.dragover {
+            transform: scale(1.02);
+            box-shadow: 0 0 60px rgba(59, 130, 246, 0.2);
+        }
+
+        .result-link {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+        .dark .result-link {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.15));
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .preview-image {
+            max-width: 100%;
+            max-height: 300px;
+            object-fit: contain;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
+            50% { box-shadow: 0 0 40px rgba(59, 130, 246, 0.5); }
+        }
+        .scanning {
+            animation: pulse-glow 1.5s ease-in-out infinite;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        .icon-bounce {
+            animation: bounce 2s infinite;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        /* Tab styles */
+        .tab-btn {
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        .tab-btn::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+        .tab-btn.active::after {
+            width: 100%;
+        }
+        .tab-btn.active {
+            color: #3b82f6;
+        }
+        .dark .tab-btn.active {
+            color: #60a5fa;
+        }
+
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        /* QR Code Preview */
+        #qrPreview {
+            min-height: 280px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f9fafb;
+        }
+        .dark #qrPreview {
+            background-color: rgba(15, 23, 42, 0.3);
+        }
+        #qrPreview svg {
+            display: block;
+        }
+
+        /* Color input styling */
+        .color-picker-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .color-picker-btn input[type="color"] {
+            position: absolute;
+            inset: -8px;
+            width: calc(100% + 16px);
+            height: calc(100% + 16px);
+            cursor: pointer;
+            border: none;
+        }
+        .color-picker-btn.transparent-bg {
+            background-image: linear-gradient(45deg, #ccc 25%, transparent 25%),
+                              linear-gradient(-45deg, #ccc 25%, transparent 25%),
+                              linear-gradient(45deg, transparent 75%, #ccc 75%),
+                              linear-gradient(-45deg, transparent 75%, #ccc 75%);
+            background-size: 12px 12px;
+            background-position: 0 0, 0 6px, 6px -6px, -6px 0px;
+        }
+        .dark .color-picker-btn.transparent-bg {
+            background-image: linear-gradient(45deg, #475569 25%, transparent 25%),
+                              linear-gradient(-45deg, #475569 25%, transparent 25%),
+                              linear-gradient(45deg, transparent 75%, #475569 75%),
+                              linear-gradient(-45deg, transparent 75%, #475569 75%);
+        }
+        #qrPreview.transparent-preview {
+            background-image: linear-gradient(45deg, #e2e8f0 25%, transparent 25%),
+                              linear-gradient(-45deg, #e2e8f0 25%, transparent 25%),
+                              linear-gradient(45deg, transparent 75%, #e2e8f0 75%),
+                              linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            background-color: #fff;
+        }
+        .dark #qrPreview.transparent-preview {
+            background-image: linear-gradient(45deg, #334155 25%, transparent 25%),
+                              linear-gradient(-45deg, #334155 25%, transparent 25%),
+                              linear-gradient(45deg, transparent 75%, #334155 75%),
+                              linear-gradient(-45deg, transparent 75%, #334155 75%);
+            background-color: #1e293b;
+        }
+
+        /* History styles */
+        .history-item {
+            transition: all 0.2s ease;
+        }
+        .history-item:hover {
+            background-color: rgba(59, 130, 246, 0.05);
+        }
+        .dark .history-item:hover {
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+        .history-item .history-actions {
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        .history-item:hover .history-actions {
+            opacity: 1;
+        }
+        .history-content {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body class="bg-[#f9fafb] text-gray-600 transition-colors duration-300 dark:bg-[#0f172a] dark:text-slate-300 min-h-screen flex flex-col font-sans">
+
+    <header class="sticky top-0 z-20 backdrop-blur-xl bg-white/80 dark:bg-slate-900/90 border-b border-gray-100 dark:border-slate-800 transition-colors duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <h1 class="text-xl font-bold tracking-tight flex items-center gap-2">
+                    <span class="bg-clip-text bg-gradient-to-r from-blue-500 to-indigo-500 dark:from-blue-400 dark:to-indigo-400">QR Code Tools</span>
+                </h1>
+
+                <div class="flex items-center gap-3 sm:gap-4">
+                    <button id="themeToggle" class="p-2 rounded-xl bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 text-gray-400 dark:text-slate-400 hover:text-brand-600 dark:hover:text-blue-400 hover:border-brand-100 dark:hover:border-slate-600 transition-all shadow-sm">
+                        <svg id="sunIcon" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                        <svg id="moonIcon" class="w-5 h-5 block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Tab Navigation -->
+    <div class="bg-white dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-800">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex gap-8">
+                <button class="tab-btn active py-4 px-2 text-sm font-semibold text-gray-600 dark:text-slate-300 hover:text-blue-500 dark:hover:text-blue-400" data-tab="decode">
+                    <span class="flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                        </svg>
+                        解碼器
+                    </span>
+                </button>
+                <button class="tab-btn py-4 px-2 text-sm font-semibold text-gray-600 dark:text-slate-300 hover:text-blue-500 dark:hover:text-blue-400" data-tab="generate">
+                    <span class="flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                        產生器
+                    </span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <main class="flex-grow container max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        
+        <!-- ==================== DECODE TAB ==================== -->
+        <div id="tab-decode" class="tab-content active">
+            <!-- Upload Zone -->
+            <div id="dropZone" class="drop-zone bg-white dark:bg-slate-800 p-8 sm:p-12 rounded-2xl shadow-soft dark:shadow-none border border-gray-100 dark:border-slate-700 cursor-pointer mb-8">
+                <input type="file" id="fileInput" accept="image/*" class="hidden">
+                
+                <div id="uploadPrompt" class="text-center">
+                    <div class="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 dark:from-blue-500/20 dark:to-purple-500/20 flex items-center justify-center">
+                        <svg class="w-10 h-10 text-blue-500 icon-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                    </div>
+                    <h2 class="text-xl font-semibold mb-2 text-gray-700 dark:text-slate-200">上傳 QR Code 圖片</h2>
+                    <p class="text-sm text-gray-400 dark:text-slate-500 mb-4">拖放圖片到這裡，或點擊選擇檔案</p>
+                    <p class="text-xs text-gray-300 dark:text-slate-600">支援 JPG、PNG、GIF、WebP 格式</p>
+                </div>
+
+                <div id="previewArea" class="hidden text-center">
+                    <img id="previewImage" class="preview-image mx-auto rounded-xl mb-4 shadow-lg" alt="QR Code Preview">
+                    <p class="text-sm text-gray-500 dark:text-slate-400">正在解碼中...</p>
+                </div>
+            </div>
+
+            <!-- Decode Result Area -->
+            <div id="resultArea" class="hidden fade-in">
+                <div class="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-2xl shadow-soft dark:shadow-none border border-gray-100 dark:border-slate-700">
+                    
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-10 h-10 rounded-xl bg-green-500/10 dark:bg-green-500/20 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-700 dark:text-slate-200">解碼成功！</h3>
+                    </div>
+
+                    <div class="result-link rounded-xl p-4 sm:p-5 mb-6">
+                        <label class="block text-xs font-medium text-gray-400 dark:text-slate-500 mb-2 uppercase tracking-wider">解碼內容</label>
+                        <div id="resultContent" class="text-gray-700 dark:text-slate-200 font-medium break-all text-sm sm:text-base leading-relaxed"></div>
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <button id="copyBtn" onclick="copyResult()" class="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold py-3.5 px-6 rounded-xl transition-all duration-200 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 flex justify-center items-center gap-2 active:transform active:scale-[0.98]">
+                            <svg id="copyIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            <span id="copyText">複製內容</span>
+                        </button>
+
+                        <a id="openLinkBtn" href="#" target="_blank" class="hidden flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3.5 px-6 rounded-xl transition-all duration-200 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 justify-center items-center gap-2 active:transform active:scale-[0.98]">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                            開啟連結
+                        </a>
+
+                        <button onclick="resetUpload()" class="flex-1 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-600 font-semibold py-3.5 px-6 rounded-xl transition-all duration-200 flex justify-center items-center gap-2 active:transform active:scale-[0.98]">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            重新上傳
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Decode Error Area -->
+            <div id="errorArea" class="hidden fade-in">
+                <div class="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-2xl shadow-soft dark:shadow-none border border-red-200 dark:border-red-900/50">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-red-500/10 dark:bg-red-500/20 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-700 dark:text-slate-200">無法解碼</h3>
+                    </div>
+                    <p class="text-gray-500 dark:text-slate-400 mb-5">無法識別圖片中的 QR Code，請確認圖片清晰且包含有效的 QR Code。</p>
+                    <button onclick="resetUpload()" class="w-full bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white font-semibold py-3.5 px-6 rounded-xl transition-all duration-200 flex justify-center items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        重新上傳
+                    </button>
+            </div>
+        </div>
+
+            <!-- Decode History -->
+            <div id="decodeHistory" class="mt-8 hidden">
+                <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-soft dark:shadow-none border border-gray-100 dark:border-slate-700">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-semibold text-gray-700 dark:text-slate-200 flex items-center gap-2">
+                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            解碼歷史記錄
+                        </h3>
+                        <button onclick="clearDecodeHistory()" class="text-xs text-gray-400 hover:text-red-500 transition-colors">清除全部</button>
+                    </div>
+                    <div id="decodeHistoryList" class="space-y-2 max-h-64 overflow-y-auto"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== GENERATE TAB ==================== -->
+        <div id="tab-generate" class="tab-content">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                
+                <!-- Input Panel -->
+                <div class="space-y-6">
+                    <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-soft dark:shadow-none border border-gray-100 dark:border-slate-700">
+                        <label for="qrInput" class="block text-sm font-semibold mb-3 text-gray-700 dark:text-slate-200">輸入內容</label>
+                        <textarea id="qrInput" rows="1" class="w-full p-4 rounded-xl bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none text-sm leading-relaxed resize-none transition-all text-gray-700 dark:text-slate-200 placeholder-gray-400 dark:placeholder-slate-500" placeholder="輸入網址或文字..."></textarea>
+                    </div>
+
+                    <!-- Options -->
+                    <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-soft dark:shadow-none border border-gray-100 dark:border-slate-700 space-y-5">
+                        <h3 class="text-sm font-semibold text-gray-700 dark:text-slate-200 mb-4">自訂樣式</h3>
+
+                        <!-- Colors -->
+                        <div class="space-y-4">
+                            <!-- Foreground Color -->
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-2">前景色 (QR Code 顏色)</label>
+                                <div class="flex items-center gap-3">
+                                    <div class="color-picker-btn" id="fgColorBtn" style="background-color: #000000;">
+                                        <input type="color" id="qrFgColor" value="#000000">
+                                    </div>
+                                    <input type="text" id="qrFgColorText" value="#000000" maxlength="7" class="w-24 px-3 py-2.5 text-sm bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-600 dark:text-slate-300 uppercase font-mono text-center">
+                                    <span class="text-xs text-gray-400 dark:text-slate-500">點擊色塊選色</span>
+                                </div>
+                            </div>
+
+                            <!-- Background Color -->
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-2">背景色</label>
+                                <div class="flex items-center gap-3">
+                                    <div class="color-picker-btn" id="bgColorBtn" style="background-color: #ffffff;">
+                                        <input type="color" id="qrBgColor" value="#ffffff">
+                                    </div>
+                                    <input type="text" id="qrBgColorText" value="#ffffff" maxlength="7" class="w-24 px-3 py-2.5 text-sm bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-600 dark:text-slate-300 uppercase font-mono text-center">
+                                    <div class="flex items-center gap-2 ml-auto">
+                                        <input type="checkbox" id="transparentBg" class="w-4 h-4 text-blue-500 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600" checked>
+                                        <label for="transparentBg" class="text-xs font-medium text-gray-500 dark:text-slate-400 cursor-pointer select-none">透明背景</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Padding -->
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-2">邊距 (Padding)</label>
+                            <div class="flex items-center gap-4">
+                                <input type="range" id="qrPadding" min="0" max="8" value="1" step="1" class="flex-1 h-2 bg-gray-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                                <span id="qrPaddingValue" class="text-sm font-medium text-gray-600 dark:text-slate-300 w-8 text-right">1</span>
+                            </div>
+                        </div>
+
+                        <!-- Error Correction Level -->
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-2">錯誤修正等級</label>
+                            <div class="grid grid-cols-4 gap-2">
+                                <label class="ecl-option">
+                                    <input type="radio" name="ecl" value="L" class="sr-only peer">
+                                    <div class="p-3 text-center rounded-lg border-2 border-gray-200 dark:border-slate-700 cursor-pointer transition-all peer-checked:border-blue-500 peer-checked:bg-blue-50 dark:peer-checked:bg-blue-900/20 hover:border-gray-300 dark:hover:border-slate-600">
+                                        <div class="text-sm font-bold text-gray-700 dark:text-slate-200">L</div>
+                                        <div class="text-[10px] text-gray-400 dark:text-slate-500 mt-0.5">7%</div>
+                                    </div>
+                                </label>
+                                <label class="ecl-option">
+                                    <input type="radio" name="ecl" value="M" class="sr-only peer" checked>
+                                    <div class="p-3 text-center rounded-lg border-2 border-gray-200 dark:border-slate-700 cursor-pointer transition-all peer-checked:border-blue-500 peer-checked:bg-blue-50 dark:peer-checked:bg-blue-900/20 hover:border-gray-300 dark:hover:border-slate-600">
+                                        <div class="text-sm font-bold text-gray-700 dark:text-slate-200">M</div>
+                                        <div class="text-[10px] text-gray-400 dark:text-slate-500 mt-0.5">15%</div>
+                                    </div>
+                                </label>
+                                <label class="ecl-option">
+                                    <input type="radio" name="ecl" value="Q" class="sr-only peer">
+                                    <div class="p-3 text-center rounded-lg border-2 border-gray-200 dark:border-slate-700 cursor-pointer transition-all peer-checked:border-blue-500 peer-checked:bg-blue-50 dark:peer-checked:bg-blue-900/20 hover:border-gray-300 dark:hover:border-slate-600">
+                                        <div class="text-sm font-bold text-gray-700 dark:text-slate-200">Q</div>
+                                        <div class="text-[10px] text-gray-400 dark:text-slate-500 mt-0.5">25%</div>
+                                    </div>
+                                </label>
+                                <label class="ecl-option">
+                                    <input type="radio" name="ecl" value="H" class="sr-only peer">
+                                    <div class="p-3 text-center rounded-lg border-2 border-gray-200 dark:border-slate-700 cursor-pointer transition-all peer-checked:border-blue-500 peer-checked:bg-blue-50 dark:peer-checked:bg-blue-900/20 hover:border-gray-300 dark:hover:border-slate-600">
+                                        <div class="text-sm font-bold text-gray-700 dark:text-slate-200">H</div>
+                                        <div class="text-[10px] text-gray-400 dark:text-slate-500 mt-0.5">30%</div>
+                                    </div>
+                                </label>
+                            </div>
+                            <p class="text-[10px] text-gray-400 dark:text-slate-500 mt-2">容錯率越高，QR Code 越複雜但越耐用</p>
+                        </div>
+                    </div>
+
+                    <!-- Generate Button -->
+                    <button onclick="generateQR()" class="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold py-4 rounded-xl transition-all duration-200 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 flex justify-center items-center gap-2 active:transform active:scale-[0.98]">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                        </svg>
+                        產生 QR Code
+                    </button>
+                </div>
+
+                <!-- Preview Panel -->
+                <div class="space-y-6">
+                    <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-soft dark:shadow-none border border-gray-100 dark:border-slate-700">
+                        <label class="flex text-sm font-semibold mb-4 text-gray-700 dark:text-slate-200">預覽</label>
+                        
+                        <div id="qrPreview" class="rounded-xl border-2 border-dashed border-gray-200 dark:border-slate-700 p-6">
+                            <div class="text-center text-gray-400 dark:text-slate-500">
+                                <svg class="w-16 h-16 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                </svg>
+                                <p class="text-sm">輸入內容後產生 QR Code</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div id="qrActions" class="hidden space-y-3">
+                        <div class="grid grid-cols-2 gap-3">
+                            <button onclick="downloadSVG()" class="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold py-3.5 px-4 rounded-xl transition-all duration-200 shadow-lg shadow-green-500/20 hover:shadow-green-500/40 flex justify-center items-center gap-2 active:transform active:scale-[0.98]">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                                下載 SVG
+                            </button>
+                            <button onclick="copySVG()" id="copySvgBtn" class="bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-600 font-semibold py-3.5 px-4 rounded-xl transition-all duration-200 flex justify-center items-center gap-2 active:transform active:scale-[0.98]">
+                                <svg id="copySvgIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                                <span id="copySvgText">複製 SVG</span>
+                            </button>
+                        </div>
+                        <button onclick="downloadPNG()" class="w-full bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-600 font-semibold py-3.5 px-4 rounded-xl transition-all duration-200 flex justify-center items-center gap-2 active:transform active:scale-[0.98]">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            下載 PNG 圖片
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Generate History -->
+            <div id="generateHistory" class="mt-8 hidden">
+                <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-soft dark:shadow-none border border-gray-100 dark:border-slate-700">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-semibold text-gray-700 dark:text-slate-200 flex items-center gap-2">
+                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            產生歷史記錄
+                        </h3>
+                        <button onclick="clearGenerateHistory()" class="text-xs text-gray-400 hover:text-red-500 transition-colors">清除全部</button>
+                    </div>
+                    <div id="generateHistoryList" class="space-y-2 max-h-64 overflow-y-auto"></div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="py-6 text-center text-xs text-gray-400 dark:text-slate-600">
+        <p>使用 jsQR & qrcode-svg 進行本地處理，資料不會上傳至伺服器</p>
+    </footer>
+
+    <canvas id="canvas" class="hidden"></canvas>
+
+    <script>
+        // --- Dark Mode Logic ---
+        const themeToggle = document.getElementById('themeToggle');
+        const sunIcon = document.getElementById('sunIcon');
+        const moonIcon = document.getElementById('moonIcon');
+        const html = document.documentElement;
+
+        function updateIcons() {
+            if (html.classList.contains('dark')) {
+                sunIcon.classList.remove('hidden');
+                moonIcon.classList.add('hidden');
+            } else {
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+            }
+        }
+
+        themeToggle.addEventListener('click', () => {
+            html.classList.toggle('dark');
+            localStorage.setItem('theme', html.classList.contains('dark') ? 'dark' : 'light');
+            updateIcons();
+        });
+
+        if (localStorage.getItem('theme') === 'light') {
+            html.classList.remove('dark');
+        }
+        updateIcons();
+
+
+        // --- Tab Logic ---
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabId = btn.dataset.tab;
+
+                tabBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                tabContents.forEach(content => {
+                    content.classList.remove('active');
+                    if (content.id === `tab-${tabId}`) {
+                        content.classList.add('active');
+                    }
+                });
+            });
+        });
+
+
+        // ==================== DECODE LOGIC ====================
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const uploadPrompt = document.getElementById('uploadPrompt');
+        const previewArea = document.getElementById('previewArea');
+        const previewImage = document.getElementById('previewImage');
+        const resultArea = document.getElementById('resultArea');
+        const resultContent = document.getElementById('resultContent');
+        const errorArea = document.getElementById('errorArea');
+        const openLinkBtn = document.getElementById('openLinkBtn');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let decodedData = '';
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && files[0].type.startsWith('image/')) {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+                uploadPrompt.classList.add('hidden');
+                previewArea.classList.remove('hidden');
+                previewImage.src = e.target.result;
+                dropZone.classList.add('scanning');
+                
+                resultArea.classList.add('hidden');
+                errorArea.classList.add('hidden');
+
+                const img = new Image();
+                img.onload = () => {
+                    decodeQRCode(img);
+                };
+                img.src = e.target.result;
+            };
+
+            reader.readAsDataURL(file);
+        }
+
+        function decodeQRCode(img) {
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: "dontInvert"
+            });
+
+            setTimeout(() => {
+                dropZone.classList.remove('scanning');
+
+                if (code) {
+                    showResult(code.data);
+                } else {
+                    const codeInverted = jsQR(imageData.data, imageData.width, imageData.height, {
+                        inversionAttempts: "attemptBoth"
+                    });
+
+                    if (codeInverted) {
+                        showResult(codeInverted.data);
+                    } else {
+                        showError();
+                    }
+                }
+            }, 500);
+        }
+
+        function showResult(data) {
+            decodedData = data;
+            resultContent.textContent = data;
+            
+            // Save to history
+            saveDecodeHistory(data);
+            
+            const urlPattern = /^(https?:\/\/|www\.)/i;
+            if (urlPattern.test(data)) {
+                let url = data;
+                if (data.toLowerCase().startsWith('www.')) {
+                    url = 'https://' + data;
+                }
+                openLinkBtn.href = url;
+                openLinkBtn.classList.remove('hidden');
+                openLinkBtn.classList.add('flex');
+            } else {
+                openLinkBtn.classList.add('hidden');
+                openLinkBtn.classList.remove('flex');
+            }
+
+            resultArea.classList.remove('hidden');
+            errorArea.classList.add('hidden');
+            resultArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function showError() {
+            resultArea.classList.add('hidden');
+            errorArea.classList.remove('hidden');
+        }
+
+        function resetUpload() {
+            fileInput.value = '';
+            uploadPrompt.classList.remove('hidden');
+            previewArea.classList.add('hidden');
+            resultArea.classList.add('hidden');
+            errorArea.classList.add('hidden');
+            dropZone.classList.remove('scanning');
+            decodedData = '';
+            dropZone.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function copyResult() {
+            if (!decodedData) return;
+
+            navigator.clipboard.writeText(decodedData).then(() => {
+                const copyIcon = document.getElementById('copyIcon');
+                const copyText = document.getElementById('copyText');
+
+                copyIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>';
+                copyText.textContent = '已複製！';
+
+                setTimeout(() => {
+                    copyIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />';
+                    copyText.textContent = '複製內容';
+                }, 2000);
+            });
+        }
+
+
+        // ==================== GENERATE LOGIC ====================
+        const qrInput = document.getElementById('qrInput');
+        const qrFgColor = document.getElementById('qrFgColor');
+        const qrFgColorText = document.getElementById('qrFgColorText');
+        const fgColorBtn = document.getElementById('fgColorBtn');
+        const qrBgColor = document.getElementById('qrBgColor');
+        const qrBgColorText = document.getElementById('qrBgColorText');
+        const bgColorBtn = document.getElementById('bgColorBtn');
+        const transparentBg = document.getElementById('transparentBg');
+        const qrPadding = document.getElementById('qrPadding');
+        const qrPaddingValue = document.getElementById('qrPaddingValue');
+        const qrPreview = document.getElementById('qrPreview');
+        const qrActions = document.getElementById('qrActions');
+
+        let currentSvgString = '';
+        let isTransparent = true; // Default to transparent
+        const FIXED_QR_SIZE = 256; // Fixed size for QR code generation
+
+        // Initialize transparent background UI
+        bgColorBtn.classList.add('transparent-bg');
+        bgColorBtn.style.backgroundColor = 'transparent';
+        qrBgColor.disabled = true;
+        qrBgColorText.disabled = true;
+        qrBgColorText.value = '透明';
+
+        // Bind padding input
+        qrPadding.addEventListener('input', () => {
+            qrPaddingValue.textContent = qrPadding.value;
+        });
+
+        // Sync foreground color inputs
+        qrFgColor.addEventListener('input', () => {
+            qrFgColorText.value = qrFgColor.value.toUpperCase();
+            fgColorBtn.style.backgroundColor = qrFgColor.value;
+        });
+        qrFgColorText.addEventListener('input', () => {
+            if (/^#[0-9A-Fa-f]{6}$/.test(qrFgColorText.value)) {
+                qrFgColor.value = qrFgColorText.value;
+                fgColorBtn.style.backgroundColor = qrFgColorText.value;
+            }
+        });
+
+        // Sync background color inputs
+        qrBgColor.addEventListener('input', () => {
+            qrBgColorText.value = qrBgColor.value.toUpperCase();
+            bgColorBtn.style.backgroundColor = qrBgColor.value;
+        });
+        qrBgColorText.addEventListener('input', () => {
+            if (/^#[0-9A-Fa-f]{6}$/.test(qrBgColorText.value)) {
+                qrBgColor.value = qrBgColorText.value;
+                bgColorBtn.style.backgroundColor = qrBgColorText.value;
+            }
+        });
+
+        // Transparent background toggle
+        transparentBg.addEventListener('change', () => {
+            isTransparent = transparentBg.checked;
+            if (isTransparent) {
+                bgColorBtn.classList.add('transparent-bg');
+                bgColorBtn.style.backgroundColor = 'transparent';
+                qrBgColor.disabled = true;
+                qrBgColorText.disabled = true;
+                qrBgColorText.value = '透明';
+                qrPreview.classList.add('transparent-preview');
+            } else {
+                bgColorBtn.classList.remove('transparent-bg');
+                bgColorBtn.style.backgroundColor = qrBgColor.value;
+                qrBgColor.disabled = false;
+                qrBgColorText.disabled = false;
+                qrBgColorText.value = qrBgColor.value.toUpperCase();
+                qrPreview.classList.remove('transparent-preview');
+            }
+        });
+
+        function generateQR() {
+            const content = qrInput.value.trim();
+            if (!content) {
+                alert('請輸入內容');
+                return;
+            }
+
+            const size = FIXED_QR_SIZE;
+            const fgColor = qrFgColor.value;
+            const bgColor = isTransparent ? 'transparent' : qrBgColor.value;
+            const padding = parseInt(qrPadding.value);
+            const ecl = document.querySelector('input[name="ecl"]:checked').value;
+
+            try {
+                const qr = new QRCode({
+                    content: content,
+                    width: size,
+                    height: size,
+                    color: fgColor,
+                    background: bgColor,
+                    padding: padding,
+                    ecl: ecl
+                });
+
+                currentSvgString = qr.svg();
+                
+                // Display SVG directly (no size modification needed)
+                qrPreview.innerHTML = '';
+                qrPreview.innerHTML = currentSvgString;
+                qrActions.classList.remove('hidden');
+                
+                // Save to history
+                saveGenerateHistory(content);
+            } catch (error) {
+                console.error('QR Code generation error:', error);
+                alert('產生 QR Code 時發生錯誤');
+            }
+        }
+
+        function downloadSVG() {
+            if (!currentSvgString) return;
+
+            const blob = new Blob([currentSvgString], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'qrcode.svg';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function copySVG() {
+            if (!currentSvgString) return;
+
+            navigator.clipboard.writeText(currentSvgString).then(() => {
+                const icon = document.getElementById('copySvgIcon');
+                const text = document.getElementById('copySvgText');
+
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>';
+                text.textContent = '已複製！';
+
+                setTimeout(() => {
+                    icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />';
+                    text.textContent = '複製 SVG';
+                }, 2000);
+            });
+        }
+
+        function downloadPNG() {
+            if (!currentSvgString) return;
+
+            const size = FIXED_QR_SIZE;
+            const svgBlob = new Blob([currentSvgString], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(svgBlob);
+
+            const img = new Image();
+            img.onload = () => {
+                const pngCanvas = document.createElement('canvas');
+                pngCanvas.width = size;
+                pngCanvas.height = size;
+                const pngCtx = pngCanvas.getContext('2d');
+                pngCtx.drawImage(img, 0, 0, size, size);
+
+                pngCanvas.toBlob(blob => {
+                    const pngUrl = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = pngUrl;
+                    a.download = 'qrcode.png';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(pngUrl);
+                }, 'image/png');
+
+                URL.revokeObjectURL(url);
+            };
+            img.src = url;
+        }
+
+        // Auto-generate on Enter key
+        qrInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                generateQR();
+            }
+        });
+
+
+        // ==================== HISTORY LOGIC ====================
+        const DECODE_HISTORY_KEY = 'qr_decode_history';
+        const GENERATE_HISTORY_KEY = 'qr_generate_history';
+        const MAX_HISTORY_ITEMS = 20;
+
+        // Load history on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            renderDecodeHistory();
+            renderGenerateHistory();
+        });
+
+        // Save decode result to history
+        function saveDecodeHistory(content) {
+            let history = JSON.parse(localStorage.getItem(DECODE_HISTORY_KEY) || '[]');
+            
+            // Remove duplicate if exists
+            history = history.filter(item => item.content !== content);
+            
+            // Add new item at the beginning
+            history.unshift({
+                content: content,
+                timestamp: new Date().toISOString(),
+                isUrl: /^(https?:\/\/|www\.)/i.test(content)
+            });
+            
+            // Keep only latest items
+            history = history.slice(0, MAX_HISTORY_ITEMS);
+            
+            localStorage.setItem(DECODE_HISTORY_KEY, JSON.stringify(history));
+            renderDecodeHistory();
+        }
+
+        // Render decode history
+        function renderDecodeHistory() {
+            const history = JSON.parse(localStorage.getItem(DECODE_HISTORY_KEY) || '[]');
+            const container = document.getElementById('decodeHistoryList');
+            const wrapper = document.getElementById('decodeHistory');
+            
+            if (history.length === 0) {
+                wrapper.classList.add('hidden');
+                return;
+            }
+            
+            wrapper.classList.remove('hidden');
+            container.innerHTML = history.map((item, index) => `
+                <div class="history-item flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-slate-900/50 group">
+                    <div class="flex-1 min-w-0">
+                        <div class="history-content text-sm text-gray-700 dark:text-slate-300">${escapeHtml(item.content)}</div>
+                        <div class="text-[10px] text-gray-400 dark:text-slate-500 mt-1">${formatTime(item.timestamp)}</div>
+                    </div>
+                    <div class="history-actions flex items-center gap-1">
+                        <button onclick="copyHistoryItem('${escapeForJs(item.content)}')" class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors" title="複製">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                        </button>
+                        ${item.isUrl ? `
+                        <a href="${item.content.startsWith('http') ? item.content : 'https://' + item.content}" target="_blank" class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-400 hover:text-blue-500 transition-colors" title="開啟連結">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                        </a>
+                        ` : ''}
+                        <button onclick="deleteDecodeHistoryItem(${index})" class="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500 transition-colors" title="刪除">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Delete single decode history item
+        function deleteDecodeHistoryItem(index) {
+            let history = JSON.parse(localStorage.getItem(DECODE_HISTORY_KEY) || '[]');
+            history.splice(index, 1);
+            localStorage.setItem(DECODE_HISTORY_KEY, JSON.stringify(history));
+            renderDecodeHistory();
+        }
+
+        // Clear all decode history
+        function clearDecodeHistory() {
+            if (confirm('確定要清除所有解碼歷史記錄嗎？')) {
+                localStorage.removeItem(DECODE_HISTORY_KEY);
+                renderDecodeHistory();
+            }
+        }
+
+        // Save generate content to history
+        function saveGenerateHistory(content) {
+            let history = JSON.parse(localStorage.getItem(GENERATE_HISTORY_KEY) || '[]');
+            
+            // Remove duplicate if exists
+            history = history.filter(item => item.content !== content);
+            
+            // Add new item at the beginning
+            history.unshift({
+                content: content,
+                timestamp: new Date().toISOString()
+            });
+            
+            // Keep only latest items
+            history = history.slice(0, MAX_HISTORY_ITEMS);
+            
+            localStorage.setItem(GENERATE_HISTORY_KEY, JSON.stringify(history));
+            renderGenerateHistory();
+        }
+
+        // Render generate history
+        function renderGenerateHistory() {
+            const history = JSON.parse(localStorage.getItem(GENERATE_HISTORY_KEY) || '[]');
+            const container = document.getElementById('generateHistoryList');
+            const wrapper = document.getElementById('generateHistory');
+            
+            if (history.length === 0) {
+                wrapper.classList.add('hidden');
+                return;
+            }
+            
+            wrapper.classList.remove('hidden');
+            container.innerHTML = history.map((item, index) => `
+                <div class="history-item flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-slate-900/50 group">
+                    <div class="flex-1 min-w-0">
+                        <div class="history-content text-sm text-gray-700 dark:text-slate-300">${escapeHtml(item.content)}</div>
+                        <div class="text-[10px] text-gray-400 dark:text-slate-500 mt-1">${formatTime(item.timestamp)}</div>
+                    </div>
+                    <div class="history-actions flex items-center gap-1">
+                        <button onclick="useGenerateHistoryItem('${escapeForJs(item.content)}')" class="p-2 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 text-gray-400 hover:text-blue-500 transition-colors" title="再次使用">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                        </button>
+                        <button onclick="copyHistoryItem('${escapeForJs(item.content)}')" class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors" title="複製">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                        </button>
+                        <button onclick="deleteGenerateHistoryItem(${index})" class="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500 transition-colors" title="刪除">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Use generate history item
+        function useGenerateHistoryItem(content) {
+            qrInput.value = content;
+            qrInput.focus();
+            generateQR();
+        }
+
+        // Delete single generate history item
+        function deleteGenerateHistoryItem(index) {
+            let history = JSON.parse(localStorage.getItem(GENERATE_HISTORY_KEY) || '[]');
+            history.splice(index, 1);
+            localStorage.setItem(GENERATE_HISTORY_KEY, JSON.stringify(history));
+            renderGenerateHistory();
+        }
+
+        // Clear all generate history
+        function clearGenerateHistory() {
+            if (confirm('確定要清除所有產生歷史記錄嗎？')) {
+                localStorage.removeItem(GENERATE_HISTORY_KEY);
+                renderGenerateHistory();
+            }
+        }
+
+        // Copy history item to clipboard
+        function copyHistoryItem(content) {
+            navigator.clipboard.writeText(content);
+        }
+
+        // Helper: Escape HTML
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // Helper: Escape for JS string
+        function escapeForJs(str) {
+            return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+        }
+
+        // Helper: Format timestamp
+        function formatTime(isoString) {
+            const date = new Date(isoString);
+            const now = new Date();
+            const diff = now - date;
+            
+            if (diff < 60000) return '剛剛';
+            if (diff < 3600000) return `${Math.floor(diff / 60000)} 分鐘前`;
+            if (diff < 86400000) return `${Math.floor(diff / 3600000)} 小時前`;
+            if (diff < 604800000) return `${Math.floor(diff / 86400000)} 天前`;
+            
+            return date.toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' });
+        }
+    </script>
+</body>
+</html>

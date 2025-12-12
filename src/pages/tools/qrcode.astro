@@ -1,0 +1,12 @@
+---
+import ToolLayout from '@/layouts/ToolLayout.astro';
+import QrCodeTool from '@/components/tools/QrCodeTool.vue';
+---
+
+<ToolLayout title="QR Code 工具">
+  <QrCodeTool client:load />
+  
+  <p slot="footer" class="text-center text-xs text-muted-foreground mt-8">
+    使用 jsQR & qrcode-svg 進行本地處理，資料不會上傳至伺服器
+  </p>
+</ToolLayout>

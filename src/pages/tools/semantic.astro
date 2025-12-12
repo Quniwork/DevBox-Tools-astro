@@ -1,0 +1,12 @@
+---
+import ToolLayout from '@/layouts/ToolLayout.astro';
+import SemanticConverter from '@/components/tools/SemanticConverter.vue';
+---
+
+<ToolLayout title="Semantic JSON 轉換器">
+  <SemanticConverter client:load />
+  
+  <p slot="footer" class="text-center text-xs text-muted-foreground mt-8">
+    將 Figma Semantic JSON 轉換為 CSS 變數格式，資料完全在本地處理
+  </p>
+</ToolLayout>

@@ -1,16 +1,228 @@
 ---
+import Layout from '@/layouts/Layout.astro';
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Globe, FileImage, Palette, QrCode, ArrowRight, Terminal, Code, Image } from 'lucide-vue-next';
+import ThemeSwitcher from '@/components/ThemeSwitcher.vue';
 
+const tools = [
+  {
+    title: "包網小工具",
+    description: "BBIN Partner 相關工具集合",
+    icon: Globe,
+    href: "/tools/partner"
+  },
+  {
+    title: "配色轉換",
+    description: "Figma 到 Layout 配色轉換",
+    icon: Palette,
+    href: "/tools/theme"
+  },
+  {
+    title: "SVG 優化",
+    description: "壓縮與優化 SVG 檔案",
+    icon: FileImage,
+    href: "/tools/svg"
+  },
+  {
+    title: "圖片轉檔",
+    description: "圖片格式轉換與壓縮",
+    icon: Image,
+    href: "/tools/image"
+  },
+  {
+    title: "QR Code",
+    description: "快速產生 QR Code",
+    icon: QrCode,
+    href: "/tools/qrcode"
+  },
+  {
+    title: "Semantic 轉換",
+    description: "Figma JSON 轉 CSS 變數",
+    icon: Code,
+    href: "/tools/semantic"
+  }
+];
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
-</html>
+<Layout title="DevBox | 開發者工具箱">
+  <div class="relative flex min-h-screen flex-col bg-background">
+    <!-- Simple Japanese Pattern Background -->
+    <div class="fixed inset-0 -z-10 opacity-[0.03]" style="background-image: radial-gradient(circle, currentColor 1px, transparent 1px); background-size: 24px 24px;"></div>
+    
+    <!-- Mobile-First Header -->
+    <header class="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
+      <div class="flex h-14 items-center justify-between px-4 sm:px-6 lg:container lg:mx-auto">
+        <div class="flex items-center gap-2.5">
+          <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+            <Terminal class="h-4 w-4 text-primary-foreground" />
+          </div>
+          <span class="text-base font-medium tracking-tight text-foreground">DevBox</span>
+        </div>
+        
+        <!-- Theme Switcher -->
+        <ThemeSwitcher client:load />
+      </div>
+    </header>
+
+    <main class="flex-1">
+
+      <!-- Tools Grid - Card Style -->
+      <section id="tools" class="px-4 py-8 sm:px-6 sm:py-12 lg:container lg:mx-auto">
+
+        <div class="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+          {tools.map((tool) => {
+            const Icon = tool.icon;
+            return (
+              <a href={tool.href} class="group block tool-card">
+                <Card class="h-full overflow-hidden rounded-2xl border-border bg-card transition-all duration-300 active:scale-[0.98] hover:border-primary/50 hover:shadow-xl hover:shadow-primary/10">
+                  <CardHeader class="p-5 sm:p-6">
+                    <!-- Icon Container -->
+                    <div class="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 transition-all duration-300 group-hover:scale-110 group-hover:bg-primary group-hover:rotate-3">
+                      <Icon class="h-5 w-5 text-primary transition-colors duration-300 group-hover:text-primary-foreground" />
+                    </div>
+                    
+                    <!-- Tool Info -->
+                    <div class="space-y-2">
+                      <CardTitle class="flex items-center gap-2 text-base font-semibold text-foreground transition-colors duration-200 group-hover:text-primary">
+                        {tool.title}
+                        <ArrowRight class="h-4 w-4 opacity-0 -translate-x-2 transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-0" />
+                      </CardTitle>
+                      <CardDescription class="text-sm leading-relaxed text-muted-foreground transition-colors duration-200 group-hover:text-foreground/80">
+                        {tool.description}
+                      </CardDescription>
+                    </div>
+                  </CardHeader>
+                </Card>
+              </a>
+            )
+          })}
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Simple Footer -->
+    <footer class="border-t border-border bg-card px-4 py-8 sm:px-6">
+      <div class="mx-auto flex flex-col items-center gap-4 text-center sm:flex-row sm:justify-between lg:container">
+        <p class="text-xs text-muted-foreground">
+          © 2024 DevBox
+        </p>
+        <div class="flex items-center gap-4 text-xs">
+          <a href="#" class="text-muted-foreground transition-colors hover:text-foreground">服務條款</a>
+          <a href="#" class="text-muted-foreground transition-colors hover:text-foreground">隱私權</a>
+          <a href="#" class="text-muted-foreground transition-colors hover:text-foreground">聯絡</a>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <style>
+    /* Mobile-First Touch Interactions */
+    @media (hover: none) and (pointer: coarse) {
+      /* Remove hover effects on touch devices */
+      .sm\:hover\:shadow-lg:hover {
+        box-shadow: none;
+      }
+    }
+
+    /* Safe Area for iOS */
+    @supports (padding: max(0px)) {
+      header {
+        padding-left: max(1rem, env(safe-area-inset-left));
+        padding-right: max(1rem, env(safe-area-inset-right));
+      }
+      
+      footer {
+        padding-bottom: max(2rem, env(safe-area-inset-bottom));
+      }
+    }
+
+    /* Smooth scrolling */
+    html {
+      scroll-behavior: smooth;
+    }
+
+    /* Better touch targets and cursor */
+    button, a {
+      -webkit-tap-highlight-color: transparent;
+      cursor: pointer;
+    }
+
+    /* Tool Card Animations */
+    .tool-card {
+      position: relative;
+    }
+
+    .tool-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 1rem;
+      padding: 1px;
+      background: linear-gradient(135deg, transparent, hsl(var(--primary) / 0.1), transparent);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+    }
+
+    .tool-card:hover::before {
+      opacity: 1;
+    }
+
+    /* Smooth transitions for all interactive elements */
+    * {
+      transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Header hover effect */
+    header {
+      transition: all 0.3s ease;
+    }
+
+    /* Footer links hover */
+    footer a {
+      position: relative;
+    }
+
+    footer a::after {
+      content: '';
+      position: absolute;
+      bottom: -2px;
+      left: 0;
+      width: 0;
+      height: 1px;
+      background: currentColor;
+      transition: width 0.3s ease;
+    }
+
+    footer a:hover::after {
+      width: 100%;
+    }
+
+    /* Add subtle animation on page load */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .tool-card {
+      animation: fadeInUp 0.5s ease backwards;
+    }
+
+    .tool-card:nth-child(1) { animation-delay: 0.1s; }
+    .tool-card:nth-child(2) { animation-delay: 0.2s; }
+    .tool-card:nth-child(3) { animation-delay: 0.3s; }
+    .tool-card:nth-child(4) { animation-delay: 0.4s; }
+    .tool-card:nth-child(5) { animation-delay: 0.5s; }
+    .tool-card:nth-child(6) { animation-delay: 0.6s; }
+  </style>
+</Layout>

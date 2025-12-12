@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Theme Information System</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Noto Sans TC', 'sans-serif'],
+                    },
+                    colors: {
+                        // 自定義柔和的藍色系
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0f0fe',
+                            500: '#60a5fa', // 更輕柔的藍
+                            600: '#3b82f6',
+                        }
+                    },
+                    boxShadow: {
+                        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)', // 自定義柔和陰影
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background-color: #e2e8f0; border-radius: 20px; }
+        .dark ::-webkit-scrollbar-thumb { background-color: #475569; }
+
+        .fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-[#f9fafb] text-gray-600 transition-colors duration-300 dark:bg-[#0f172a] dark:text-slate-300 min-h-screen flex flex-col font-sans">
+
+    <header class="sticky top-0 z-20 backdrop-blur-xl bg-white/80 dark:bg-slate-900/90 border-b border-gray-100 dark:border-slate-800 transition-colors duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+
+                <h1 class="text-xl font-bold tracking-tight flex items-center gap-2">
+                    <span class="bg-clip-text bg-gradient-to-r from-blue-500 to-indigo-500 dark:from-blue-400 dark:to-indigo-400">Theme Information System</span>
+                </h1>
+
+                <div class="flex items-center gap-3 sm:gap-4">
+                    <nav class="flex p-1 bg-gray-100/50 dark:bg-slate-800/50 rounded-xl border border-gray-100 dark:border-slate-700/50" id="nav-container">
+                        <button id="btn-themes" onclick="showTab('themes')" class="relative px-3 sm:px-4 py-1.5 text-sm font-medium rounded-lg transition-all duration-300 whitespace-nowrap">
+                            主題列表
+                        </button>
+                        <button id="btn-games" onclick="showTab('games')" class="relative px-3 sm:px-4 py-1.5 text-sm font-medium rounded-lg transition-all duration-300 whitespace-nowrap">
+                            遊戲/平台查詢
+                        </button>
+                    </nav>
+
+                    <button id="theme-toggle" class="p-2 rounded-xl bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 text-gray-400 dark:text-slate-400 hover:text-brand-600 dark:hover:text-blue-400 hover:border-brand-100 dark:hover:border-slate-600 transition-all shadow-sm">
+                        <svg id="sun-icon" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                        <svg id="moon-icon" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path></svg>
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </header>
+
+    <div class="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
+
+        <div id="loading" class="flex flex-col items-center justify-center py-24 opacity-60">
+            <div class="animate-spin rounded-full h-8 w-8 border-2 border-brand-500 border-t-transparent"></div>
+            <p class="mt-4 text-gray-400 dark:text-slate-500 text-sm tracking-wide">載入中...</p>
+        </div>
+
+        <div id="main-content" class="hidden fade-in">
+
+            <div id="home-view" class="block">
+                <div id="config-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+                    </div>
+            </div>
+
+            <div id="game-view" class="hidden">
+                <div class="max-w-2xl mx-auto mb-10">
+                    <div class="relative group">
+                        <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400 group-focus-within:text-brand-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+                        <input
+                            type="text"
+                            id="game-search"
+                            class="block w-full pl-12 pr-6 py-4 border-0 rounded-2xl bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:bg-white dark:focus:bg-slate-800 transition-all duration-300 shadow-soft"
+                            placeholder="搜尋遊戲或平台名稱... (例如: BB, MG, 麻將胡了)"
+                            oninput="searchGames(this.value)"
+                        />
+                    </div>
+                </div>
+                <div id="game-results" class="space-y-4">
+                    </div>
+            </div>
+        </div>
+
+        <div id="detail-view" class="hidden fade-in">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-4 mb-8">
+                <button class="w-fit flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-full text-sm font-medium text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white transition-all shadow-sm hover:shadow-md" onclick="showMainContent()">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                    返回列表
+                </button>
+                <div class="h-px flex-grow bg-gray-100 dark:bg-slate-800 sm:hidden"></div>
+                <h2 id="detail-title" class="text-2xl font-bold text-gray-800 dark:text-white tracking-tight">Theme Details</h2>
+            </div>
+
+            <div id="theme-list-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Dark Mode Logic ---
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const htmlElement = document.documentElement;
+        const sunIcon = document.getElementById('sun-icon');
+        const moonIcon = document.getElementById('moon-icon');
+
+        function updateThemeIcon() {
+            if (htmlElement.classList.contains('dark')) {
+                sunIcon.classList.remove('hidden');
+                moonIcon.classList.add('hidden');
+            } else {
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+            }
+        }
+
+        // Init Theme
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            htmlElement.classList.add('dark');
+        } else {
+            htmlElement.classList.remove('dark');
+        }
+        updateThemeIcon();
+
+        themeToggleBtn.addEventListener('click', () => {
+            htmlElement.classList.toggle('dark');
+            localStorage.theme = htmlElement.classList.contains('dark') ? 'dark' : 'light';
+            updateThemeIcon();
+        });
+
+        // --- Application Logic ---
+        const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbxIwTeg20huQ4YnVtz5g1n48aujG-B_LgaHDWU1CxGDAmAKyR8loTCAWtNpJEh-wwWp6w/exec';
+
+        const VAR_MAPPING = {
+            "1": { key: "Var1_Pri", name: "主要顏色(1)", varName: 'primary' },
+            "2": { key: "Var2_Sec", name: "輔助顏色(2)", varName: 'secondary' },
+            "3": { key: "Var3_Ter", name: "次輔助顏色(3)", varName: 'tertiary' },
+            "4": { key: "Var4_Pri_Bg", name: "主背景顏色(4)", varName: 'primary-bg' },
+            "5": { key: "Var5_Sec_Bg", name: "輔助背景顏色(5)", varName: 'secondary-bg' },
+            "6": { key: "Var6_Ter_Bg", name: "次輔助背景顏色(6)", varName: 'tertiary-bg' },
+            "7": { key: "Var7_Pri_Text", name: "主文字顏色(7)", varName: 'primary-text' },
+            "8": { key: "Var8_Sec_Text", name: "輔助文字顏色(8)", varName: 'secondary-text' },
+            "9": { key: "Var9_Ter_Text", name: "輔助文字顏色(9)", varName: 'tertiary-text' },
+        };
+
+        let globalData = { config: [], list: [], game: [] };
+
+        function init() {
+            fetch(GAS_API_URL)
+                .then(response => response.json())
+                .then(data => {
+                    globalData = data;
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('main-content').style.display = 'block';
+                    renderHome();
+                })
+                .catch(err => {
+                    document.getElementById('loading').innerHTML = `<div class="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg border border-red-100 dark:border-red-800">⚠️ 連線失敗，請重新整理頁面</div>`;
+                    console.error(err);
+                });
+        }
+
+        function renderHome() {
+            const container = document.getElementById('config-grid');
+            container.innerHTML = '';
+
+            globalData.config.forEach(item => {
+                if (!item.Theme_Name) return;
+
+                const activeVars = item.Active_Variables
+                    ? String(item.Active_Variables).split(/,|，/).map(s => s.trim())
+                    : [];
+
+                const colorNamesHtml = activeVars.map(vId => {
+                    // 更輕柔的 Tag 樣式
+                    return VAR_MAPPING[vId] ? `<span class="inline-block px-2.5 py-1 rounded-md text-[11px] font-medium bg-gray-50 text-gray-500 dark:bg-slate-700/50 dark:text-slate-400 border border-gray-100 dark:border-slate-600 mr-1.5 mb-1.5 tracking-wide">${VAR_MAPPING[vId].name}</span>` : '';
+                }).join('');
+
+                const card = document.createElement('div');
+                // 輕柔卡片樣式：白色背景，極淡邊框，柔和陰影
+                card.className = 'group bg-white dark:bg-slate-800 rounded-2xl p-6 border border-gray-100 dark:border-slate-700 shadow-soft dark:shadow-none hover:shadow-lg dark:hover:border-slate-600 hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col h-full';
+                card.innerHTML = `
+                    <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-50 dark:border-slate-700/50">
+                        <span class="text-lg font-bold text-gray-800 dark:text-blue-400 group-hover:text-brand-600 transition-colors">#${item.Theme_Name}</span>
+                        <div class="w-8 h-8 rounded-full bg-gray-50 dark:bg-slate-700 flex items-center justify-center group-hover:bg-brand-50 dark:group-hover:bg-blue-900/30 transition-colors">
+                            <svg class="w-4 h-4 text-gray-300 dark:text-slate-500 group-hover:text-brand-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                        </div>
+                    </div>
+                    <div class="flex-grow">
+                        <strong class="block mb-2.5 text-[10px] uppercase tracking-wider text-gray-400 dark:text-slate-500 font-semibold">Active Variables</strong>
+                        <div class="flex flex-wrap">
+                            ${colorNamesHtml || '<span class="italic text-gray-300 text-xs">None</span>'}
+                        </div>
+                    </div>
+                `;
+                card.onclick = () => showDetail(item.Theme_Name, activeVars);
+                container.appendChild(card);
+            });
+        }
+
+        function showDetail(themeName, activeVars) {
+            document.getElementById('main-content').style.display = 'none';
+            document.getElementById('detail-view').style.display = 'block';
+            document.getElementById('detail-title').innerText = `#${themeName}`;
+            window.scrollTo(0, 0);
+
+            const container = document.getElementById('theme-list-grid');
+            container.innerHTML = '';
+
+            const filteredThemes = globalData.list.filter(t => String(t.Theme_Name) === String(themeName));
+
+            if (filteredThemes.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-400 col-span-full py-10">No details found.</p>';
+                return;
+            }
+
+            filteredThemes.forEach(theme => {
+                const themeId = theme.Theme_Color;
+                const colorData = {};
+
+                activeVars.forEach(vId => {
+                    const mapping = VAR_MAPPING[vId];
+                    if (mapping) {
+                        const colorCode = theme[mapping.key];
+                        if (colorCode) colorData[mapping.varName] = colorCode;
+                    }
+                });
+
+                let colorHtml = `
+                    <div class="mt-5 pt-4 border-t border-dashed border-gray-100 dark:border-slate-700">
+                        <div class="flex justify-between items-center mb-4">
+                            <strong class="text-[10px] uppercase tracking-wider text-gray-400 dark:text-slate-400 font-bold">Palette</strong>
+                            <button class="text-[11px] px-3 py-1 rounded-md bg-gray-50 dark:bg-slate-700 text-gray-500 dark:text-slate-300 hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-blue-900/30 dark:hover:text-blue-300 transition-colors border border-gray-100 dark:border-slate-600 flex items-center gap-1.5" onclick='copyAllColors(${JSON.stringify(themeId)}, ${JSON.stringify(colorData)})'>
+                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
+                                Copy CSS
+                            </button>
+                        </div>
+                        <div class="space-y-2.5">
+                `;
+
+                activeVars.forEach(vId => {
+                    const mapping = VAR_MAPPING[vId];
+                    if (mapping) {
+                        const colorCode = theme[mapping.key];
+                        if (colorCode) {
+                            colorHtml += `
+                                <div class="flex items-center p-2.5 bg-gray-50/50 dark:bg-slate-700/30 rounded-xl border border-transparent hover:border-gray-200 dark:hover:border-slate-500 hover:bg-white dark:hover:bg-slate-700 transition-all group/row cursor-pointer" onclick="copyToClipboard('${colorCode}')">
+                                    <div class="w-9 h-9 rounded-lg shadow-sm border border-gray-100 dark:border-slate-600 mr-3.5 flex-shrink-0" style="background-color: ${colorCode};"></div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-[11px] text-gray-400 dark:text-slate-400 truncate mb-0.5">${mapping.varName}</div>
+                                        <div class="font-mono text-sm font-semibold text-gray-700 dark:text-slate-200 tracking-wide">${colorCode}</div>
+                                    </div>
+                                    <span class="text-[10px] text-brand-500 opacity-0 group-hover/row:opacity-100 transition-opacity font-medium bg-brand-50 px-2 py-0.5 rounded">Copy</span>
+                                </div>
+                            `;
+                        }
+                    }
+                });
+                colorHtml += '</div></div>';
+
+                const card = document.createElement('div');
+                card.className = 'bg-white dark:bg-slate-800 rounded-2xl p-6 border border-gray-100 dark:border-slate-700 shadow-soft dark:shadow-none flex flex-col';
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-5">
+                        <div class="text-xl font-bold text-gray-800 dark:text-white font-mono tracking-tight">
+                            ${theme.Theme_Color}
+                        </div>
+                        <span class="px-2.5 py-1 text-[11px] font-semibold bg-gray-100 text-gray-600 dark:bg-blue-900/30 dark:text-blue-300 rounded-lg">
+                            ${theme.Theme_Mode}
+                        </span>
+                    </div>
+
+                    <div class="bg-gray-50/80 dark:bg-slate-700/30 rounded-xl p-4 text-sm grid grid-cols-2 gap-y-4 gap-x-4 mb-2 border border-dashed border-gray-200 dark:border-slate-700/50">
+                        <div class="flex flex-col"><span class="text-[10px] uppercase text-gray-400 font-bold mb-0.5">Nav</span><span class="font-medium text-gray-700 dark:text-slate-200 truncate" title="${theme.Theme_NavType}">${theme.Theme_NavType}</span></div>
+                        <div class="flex flex-col"><span class="text-[10px] uppercase text-gray-400 font-bold mb-0.5">QRCode</span><span class="font-medium text-gray-700 dark:text-slate-200 truncate" title="${theme.Theme_QRCode}">${theme.Theme_QRCode}</span></div>
+                        <div class="flex flex-col"><span class="text-[10px] uppercase text-gray-400 font-bold mb-0.5">Footer BB</span><span class="font-medium text-gray-700 dark:text-slate-200 truncate" title="${theme.Foot_BB}">${theme.Foot_BB}</span></div>
+                        <div class="flex flex-col"><span class="text-[10px] uppercase text-gray-400 font-bold mb-0.5">Footer UB</span><span class="font-medium text-gray-700 dark:text-slate-200 truncate" title="${theme.Foot_UB}">${theme.Foot_UB}</span></div>
+
+                        <div class="col-span-2 flex items-center justify-between pt-3 border-t border-dashed border-gray-200 dark:border-slate-600/50 mt-1">
+                            <span class="text-xs text-gray-500">Theme Pri</span>
+                            <div class="flex items-center gap-2">
+                                <span class="w-3.5 h-3.5 rounded-full border border-gray-200 shadow-sm" style="background:${theme.Theme_Pri ?? '#fff'}"></span>
+                                <span class="font-mono text-xs text-gray-600 dark:text-slate-300">${theme.Theme_Pri ?? ''}</span>
+                            </div>
+                        </div>
+                        <div class="col-span-2 flex items-center justify-between">
+                            <span class="text-xs text-gray-500">Theme Sec</span>
+                            <div class="flex items-center gap-2">
+                                <span class="w-3.5 h-3.5 rounded-full border border-gray-200 shadow-sm" style="background:${theme.Theme_Sec ?? '#fff'}"></span>
+                                <span class="font-mono text-xs text-gray-600 dark:text-slate-300">${theme.Theme_Sec ?? ''}</span>
+                            </div>
+                        </div>
+                    </div>
+                    ${colorHtml}
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function showMainContent() {
+            document.getElementById('main-content').style.display = 'block';
+            document.getElementById('detail-view').style.display = 'none';
+            window.scrollTo(0, 0);
+        }
+
+        function showTab(tab) {
+            const btnThemes = document.getElementById('btn-themes');
+            const btnGames = document.getElementById('btn-games');
+
+            // Active styles: White bg + subtle shadow + color text (Light Mode) / Slate bg (Dark Mode)
+            const activeClass = "bg-white text-gray-800 shadow-sm dark:bg-slate-700 dark:text-white";
+            // Inactive styles: Transparent bg + gray text
+            const inactiveClass = "text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200";
+
+            // Reset base classes
+            const baseClass = "relative px-3 sm:px-4 py-1.5 text-sm font-medium rounded-lg transition-all duration-300 whitespace-nowrap";
+
+            btnThemes.className = baseClass;
+            btnGames.className = baseClass;
+
+            if (tab === 'themes') {
+                document.getElementById('home-view').classList.remove('hidden');
+                document.getElementById('game-view').classList.add('hidden');
+
+                btnThemes.className += ` ${activeClass}`;
+                btnGames.className += ` ${inactiveClass}`;
+            } else if (tab === 'games') {
+                document.getElementById('home-view').classList.add('hidden');
+                document.getElementById('game-view').classList.remove('hidden');
+
+                btnThemes.className += ` ${inactiveClass}`;
+                btnGames.className += ` ${activeClass}`;
+
+                setTimeout(() => document.getElementById('game-search').focus(), 100);
+            }
+
+            document.getElementById('detail-view').style.display = 'none';
+            document.getElementById('main-content').style.display = 'block';
+        }
+
+        function searchGames(query) {
+            const resultsContainer = document.getElementById('game-results');
+
+            if (!query || query.trim().length === 0) {
+                resultsContainer.innerHTML = '<div class="text-center py-16 text-gray-300 dark:text-slate-600">請輸入關鍵字開始搜尋</div>';
+                return;
+            }
+
+            const searchTerm = query.trim().toLowerCase();
+            const results = [];
+
+            globalData.game.forEach(themeGame => {
+                const themeName = themeGame.Theme_Name;
+                const matches = [];
+
+                for (let i = 1; i <= 7; i++) {
+                    const areaKey = i === 1 ? 'Area' : `Area_${i}`;
+                    const gameKey = i === 1 ? 'Game' : `Game_${i}`;
+                    const area = themeGame[areaKey];
+                    const games = themeGame[gameKey];
+
+                    if (area && games) {
+                        if (games.toLowerCase().includes(searchTerm)) {
+                            matches.push({ area, games });
+                        }
+                    }
+                }
+
+                if (matches.length > 0) {
+                    results.push({ themeName, matches });
+                }
+            });
+
+            if (results.length === 0) {
+                resultsContainer.innerHTML = `<div class="text-center py-12 text-gray-400">找不到包含 "${query}" 的結果</div>`;
+                return;
+            }
+
+            let html = `<div class="text-xs text-gray-400 mb-4 px-1 tracking-wide">找到 ${results.length} 個相關結果</div>`;
+
+            results.forEach(result => {
+                result.matches.forEach(match => {
+                    const highlightedGames = match.games.replace(
+                        new RegExp(`(${escapeRegex(query)})`, 'gi'),
+                        '<span class="bg-yellow-100 text-yellow-800 dark:bg-yellow-600/40 dark:text-yellow-100 px-1 rounded mx-0.5">$1</span>'
+                    );
+
+                    html += `
+                        <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-gray-100 dark:border-slate-700 hover:border-brand-200 dark:hover:border-blue-500 transition-colors shadow-soft dark:shadow-none">
+                            <div class="flex justify-between items-center mb-2.5">
+                                <span class="font-bold text-brand-600 dark:text-blue-400">#${result.themeName}</span>
+                                <span class="text-[11px] px-2 py-0.5 bg-gray-50 dark:bg-slate-700 rounded-md text-gray-500 dark:text-slate-300 font-medium border border-gray-100 dark:border-slate-600">${match.area}</span>
+                            </div>
+                            <div class="text-sm text-gray-600 dark:text-slate-300 leading-relaxed">${highlightedGames}</div>
+                        </div>
+                    `;
+                });
+            });
+
+            resultsContainer.innerHTML = html;
+        }
+
+        function escapeRegex(string) {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+
+        function hexToRgb(hex) {
+            hex = hex.replace('#', '');
+            const r = parseInt(hex.substring(0, 2), 16);
+            const g = parseInt(hex.substring(2, 4), 16);
+            const b = parseInt(hex.substring(4, 6), 16);
+            return `${r} ${g} ${b}`;
+        }
+
+        function copyAllColors(themeId, colorData) {
+            let cssText = `/* ${themeId} */\n`;
+            cssText += `:root[data-theme~="${themeId}"] {\n`;
+
+            const maxVarNameLength = Math.max(
+                ...Object.keys(colorData).map(varName => `--color-${varName}:`.length)
+            );
+
+            for (const [varName, hexColor] of Object.entries(colorData)) {
+                const rgbValue = hexToRgb(hexColor);
+                const paddedVarName = `--color-${varName}:`.padEnd(maxVarNameLength + 1);
+                cssText += `    ${paddedVarName}${rgbValue};`.padEnd(maxVarNameLength + 22) + `/* ${hexColor} */\n`;
+            }
+
+            cssText += `}`;
+
+            navigator.clipboard.writeText(cssText).then(() => {
+                // alert('CSS copied to clipboard!');
+            });
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text);
+        }
+
+        // Initialize Tab Styles
+        showTab('themes');
+
+        // Start App
+        init();
+    </script>
+</body>
+</html>

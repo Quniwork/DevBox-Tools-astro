@@ -1,0 +1,181 @@
+@import "tailwindcss";
+@import "./components.css";
+
+@theme {
+  --font-sans: 'Inter', 'Noto Sans TC', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --radius: 0.5rem;
+
+  /* Map CSS variables to Tailwind colors */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  /* Softer shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.03);
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.05), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.05), 0 8px 10px -6px rgb(0 0 0 / 0.05);
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  @keyframes accordion-down {
+    from { height: 0; }
+    to { height: var(--radix-accordion-content-height); }
+  }
+  @keyframes accordion-up {
+    from { height: var(--radix-accordion-content-height); }
+    to { height: 0; }
+  }
+}
+
+@layer base {
+  :root {
+    /* Light Mode - Clean White/Gray (matching svg.html) */
+    /* ------------------------------------------------------------------ */
+
+    /* Background: #f9fafb */
+    --background: hsl(210 20% 98%);
+
+    /* Text: gray-600 #4b5563 */
+    --foreground: hsl(220 9% 34%);
+
+    /* Card: white #ffffff */
+    --card: hsl(0 0% 100%);
+    --card-foreground: hsl(220 9% 34%);
+
+    /* Popover: white */
+    --popover: hsl(0 0% 100%);
+    --popover-foreground: hsl(220 9% 34%);
+
+    /* Primary */
+    --primary: hsl(193 43% 67%);
+    --primary-foreground: hsl(220 16% 22%); /* nord0 - Dark text on bright button */
+
+    /* Secondary */
+    --secondary: hsl(220 14% 96%);
+    --secondary-foreground: hsl(220 9% 34%);
+
+    /* Muted */
+    --muted: hsl(220 14% 96%);
+    --muted-foreground: hsl(220 9% 46%); /* gray-500 */
+
+    /* Accent */
+    --accent: hsl(210, 18%, 91%);
+    --accent-foreground: hsl(220 9% 34%);
+
+    /* Destructive */
+    --destructive: hsl(0 84% 60%);
+    --destructive-foreground: hsl(0 0% 100%);
+
+    /* Border: very light gray */
+    /* --border: hsl(220 13% 95%); */
+    --border: hsl(220 13% 95%);
+    --input: hsl(220 13% 95%);
+    --ring: hsl(193 43% 67%); /* 與 primary 一致 */
+
+    /* Charts (Aurora) */
+    --chart-1: hsl(193 43% 67%); /* nord8 */
+    --chart-2: hsl(213 32% 52%); /* nord9 */
+    --chart-3: hsl(225 27% 51%); /* nord10 */
+    --chart-4: hsl(92 28% 65%);  /* nord14 */
+    --chart-5: hsl(354 42% 56%); /* nord11 */
+  }
+
+  .dark {
+    /* Nord Theme - Dark Mode (Polar Night) */
+
+    /* Background: nord0 #2E3440 -> hsl(220 16% 22%) */
+    --background: hsl(220 16% 22%);
+
+    /* Text: nord6 #ECEFF4 -> hsl(210 29% 94%) */
+    --foreground: hsl(210 29% 94%);
+
+    /* Card: nord1 #3B4252 -> hsl(222 16% 28%) */
+    --card: hsl(222 16% 28%);
+    --card-foreground: hsl(210 29% 94%);
+
+    /* Popover: nord0 #2E3440 */
+    --popover: hsl(220 16% 22%);
+    --popover-foreground: hsl(210 29% 94%);
+
+    /* Primary: nord8 #88C0D0 (Ice Blue) -> hsl(193 43% 67%) */
+    --primary: hsl(193 43% 67%);
+    --primary-foreground: hsl(220 16% 22%); /* nord0 - Dark text on bright button */
+
+    /* Secondary: nord2 #434C5E -> hsl(223 16% 34%) */
+    --secondary: hsl(223 16% 34%);
+    --secondary-foreground: hsl(210 29% 94%);
+
+    /* Muted: nord2 #434C5E */
+    --muted: hsl(223 16% 34%);
+    --muted-foreground: hsl(218 20% 88%); /* nord4 */
+
+    /* Accent: nord2 #434C5E */
+    --accent: hsl(223 16% 34%);
+    --accent-foreground: hsl(210 29% 94%);
+
+    /* Destructive: nord11 #BF616A */
+    --destructive: hsl(354 42% 56%);
+    --destructive-foreground: hsl(210 29% 94%);
+
+    /* Border: nord2 #434C5E */
+    --border: hsl(223 16% 34%);
+    --input: hsl(223 16% 34%);
+    --ring: hsl(193 43% 67%); /* nord8 */
+
+    /* Charts (Aurora) */
+    --chart-1: hsl(193 43% 67%); /* nord8 */
+    --chart-2: hsl(213 32% 52%); /* nord9 */
+    --chart-3: hsl(225 27% 51%); /* nord10 */
+    --chart-4: hsl(92 28% 65%);  /* nord14 */
+    --chart-5: hsl(354 42% 56%); /* nord11 */
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+}

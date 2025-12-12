@@ -1,0 +1,140 @@
+/**
+ * 共用 CSS 樣式
+ * 包含 Checkbox、Slider、Modal 等元件樣式
+ */
+
+/* ========================================
+   Custom Checkbox
+   ======================================== */
+.custom-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  background-color: var(--background);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.custom-checkbox:hover {
+  border-color: var(--primary);
+}
+
+.custom-checkbox:checked {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+.custom-checkbox:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 5px;
+  height: 9px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.custom-checkbox:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.custom-checkbox:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ========================================
+   Quality Slider
+   ======================================== */
+.quality-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right, var(--primary) 0%, var(--primary) calc(var(--value, 85) * 1%), var(--border) calc(var(--value, 85) * 1%), var(--border) 100%);
+  outline: none;
+  transition: background 0.2s;
+}
+
+.quality-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  border: 3px solid var(--background);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s ease;
+}
+
+.quality-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+.quality-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  border: 3px solid var(--background);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.quality-slider:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.quality-slider:disabled::-webkit-slider-thumb {
+  cursor: not-allowed;
+}
+
+/* ========================================
+   Modal Transitions
+   ======================================== */
+.modal-enter-active,
+.modal-leave-active {
+  transition: all 0.3s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+
+.modal-enter-from .relative,
+.modal-leave-to .relative {
+  transform: scale(0.95);
+}
+
+/* ========================================
+   SVG Preview Container (for SvgOptimizer)
+   ======================================== */
+.svg-preview-container {
+  width: 100%;
+  height: 100%;
+  min-height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.svg-preview-image {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  display: block;
+  object-fit: contain;
+}
