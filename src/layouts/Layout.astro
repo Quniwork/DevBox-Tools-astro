@@ -24,14 +24,41 @@ const { title } = Astro.props;
     <!-- Prevent flash of wrong theme -->
     <script is:inline>
       (function() {
-        const stored = localStorage.getItem('theme');
+        const stored = localStorage.getItem('app-theme');
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const isDark = stored ? stored === 'dark' : prefersDark;
-        if (isDark) {
-          document.documentElement.classList.add('dark');
+        let themeClass = '';
+        
+        if (stored) {
+          // 根據儲存的主題 ID 設定 class
+          switch (stored) {
+            case 'nord-dark':
+              themeClass = 'dark';
+              break;
+            case 'ant-light':
+              themeClass = 'ant-light';
+              break;
+            case 'ant-dark':
+              themeClass = 'ant-dark';
+              break;
+            // nord-light 不需要 class
+          }
+        } else if (prefersDark) {
+          themeClass = 'dark';
+        }
+        
+        if (themeClass) {
+          document.documentElement.classList.add(themeClass);
         }
       })();
     </script>
+    <!-- 關鍵內聯 CSS：防止載入時閃白 -->
+    <style is:inline>
+      :root { --background: hsl(210 20% 98%); }
+      .dark { --background: hsl(220 16% 22%); }
+      .ant-light { --background: hsl(214 20% 95%); }
+      .ant-dark { --background: hsl(0 0% 8%); }
+      html, body { background-color: var(--background); }
+    </style>
   </head>
   <body class="min-h-screen bg-background font-sans antialiased">
     <slot />

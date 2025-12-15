@@ -443,9 +443,19 @@ const copySvg = async () => {
         </Button>
       </div>
       <!-- Preview Panel (Right) -->
-      <div class="flex flex-col gap-4">
+      <div class="flex flex-col gap-4 min-h-96">
         <Card class="border-border bg-card p-5 flex-1 flex flex-col">
-          <label class="block text-sm font-semibold text-foreground mb-4">預覽</label>
+          <div class="flex items-center justify-between mb-4">
+            <label class="block text-sm font-semibold text-foreground">預覽</label>
+            <button 
+              v-if="generatedSvg"
+              @click="generatedSvg = ''; generatedDataUrl = ''" 
+              title="清除"
+              class="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+            >
+              <Trash2 class="h-4 w-4" />
+            </button>
+          </div>
 
           <div
             :class="[
@@ -485,7 +495,7 @@ const copySvg = async () => {
 <style scoped>
 .qr-preview {
   width: 100%;
-  min-height: 200px;
+  min-height: 160px;
   background-color: var(--card);
   background-size: 20px 20px;
   background-position: 0 0, 0 10px, 10px -10px, -10px 0px;

@@ -68,7 +68,7 @@
 
 @layer base {
   :root {
-    /* Light Mode - Clean White/Gray (matching svg.html) */
+    /* Light Mode - Nord Light (預設) */
     /* ------------------------------------------------------------------ */
 
     /* Background: #f9fafb */
@@ -106,7 +106,6 @@
     --destructive-foreground: hsl(0 0% 100%);
 
     /* Border: very light gray */
-    /* --border: hsl(220 13% 95%); */
     --border: hsl(220 13% 95%);
     --input: hsl(220 13% 95%);
     --ring: hsl(193 43% 67%); /* 與 primary 一致 */
@@ -167,6 +166,110 @@
     --chart-3: hsl(225 27% 51%); /* nord10 */
     --chart-4: hsl(92 28% 65%);  /* nord14 */
     --chart-5: hsl(354 42% 56%); /* nord11 */
+  }
+
+  /* ================================================================
+     Ant Design V4 Light Theme
+     基於 Ant Design 官方配色 (灰色帶藍調)
+     ================================================================ */
+  .ant-light {
+    /* Background: 帶藍的淺灰 */
+    --background: hsl(214 20% 95%);
+
+    /* Text: 深藍灰 */
+    --foreground: hsl(214 20% 15%);
+
+    /* Card: 微藍白 */
+    --card: hsl(210 20% 99%);
+    --card-foreground: hsl(214 20% 15%);
+
+    /* Popover */
+    --popover: hsl(210 20% 99%);
+    --popover-foreground: hsl(214 20% 15%);
+
+    /* Primary: Ant Blue #1890ff */
+    --primary: hsl(209 100% 55%);
+    --primary-foreground: hsl(0 0% 100%);
+
+    /* Secondary: 帶藍的淺灰 */
+    --secondary: hsl(214 15% 96%);
+    --secondary-foreground: hsl(214 20% 15%);
+
+    /* Muted: 帶藍的灰 */
+    --muted: hsl(214 15% 93%);
+    --muted-foreground: hsl(214 15% 40%);
+
+    /* Accent: light blue hover */
+    --accent: hsl(209 60% 95%);
+    --accent-foreground: hsl(209 100% 40%);
+
+    /* Destructive: #ff4d4f */
+    --destructive: hsl(0 100% 65%);
+    --destructive-foreground: hsl(0 0% 100%);
+
+    /* Border: 帶藍的灰邊框 */
+    --border: hsl(214 15% 82%);
+    --input: hsl(214 15% 82%);
+    --ring: hsl(209 100% 55%);
+
+    /* Charts */
+    --chart-1: hsl(209 100% 55%); /* blue */
+    --chart-2: hsl(160 84% 39%);  /* green #52c41a */
+    --chart-3: hsl(35 100% 50%);  /* orange #fa8c16 */
+    --chart-4: hsl(274 71% 57%);  /* purple #722ed1 */
+    --chart-5: hsl(0 100% 65%);   /* red */
+  }
+
+  /* ================================================================
+     Ant Design V4 Dark Theme
+     基於 Ant Design Pro 暗色配色
+     ================================================================ */
+  .ant-dark {
+    /* Background: #141414 */
+    --background: hsl(0 0% 8%);
+
+    /* Text: rgba(255,255,255,0.85) */
+    --foreground: hsl(0 0% 90%);
+
+    /* Card: #1f1f1f */
+    --card: hsl(0 0% 12%);
+    --card-foreground: hsl(0 0% 90%);
+
+    /* Popover: #1f1f1f */
+    --popover: hsl(0 0% 12%);
+    --popover-foreground: hsl(0 0% 90%);
+
+    /* Primary: Ant Blue (brighter for dark) #177ddc */
+    --primary: hsl(209 85% 48%);
+    --primary-foreground: hsl(0 0% 100%);
+
+    /* Secondary: #262626 */
+    --secondary: hsl(0 0% 15%);
+    --secondary-foreground: hsl(0 0% 90%);
+
+    /* Muted: #262626 */
+    --muted: hsl(0 0% 15%);
+    --muted-foreground: hsl(0 0% 60%);
+
+    /* Accent: dark blue hover */
+    --accent: hsl(209 85% 20%);
+    --accent-foreground: hsl(209 85% 65%);
+
+    /* Destructive: #a61d24 */
+    --destructive: hsl(357 72% 38%);
+    --destructive-foreground: hsl(0 0% 100%);
+
+    /* Border: #434343 */
+    --border: hsl(0 0% 26%);
+    --input: hsl(0 0% 26%);
+    --ring: hsl(209 85% 48%);
+
+    /* Charts */
+    --chart-1: hsl(209 85% 55%);  /* blue */
+    --chart-2: hsl(160 64% 45%);  /* green */
+    --chart-3: hsl(35 90% 55%);   /* orange */
+    --chart-4: hsl(274 60% 60%);  /* purple */
+    --chart-5: hsl(357 72% 50%);  /* red */
   }
 }
 

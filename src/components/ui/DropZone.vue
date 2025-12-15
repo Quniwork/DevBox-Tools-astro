@@ -57,7 +57,7 @@ const triggerFileInput = () => {
 
 <template>
   <Card 
-    class="border-dashed border-[#88C0D0] bg-card p-8 transition-all cursor-pointer"
+    class="flex justify-center items-center border-dashed border-[#88C0D0] bg-card p-8 min-h-96 transition-all cursor-pointer"
     :class="{ 'border-primary bg-primary/5': isDragging }"
     @dragover.prevent="isDragging = true"
     @dragleave.prevent="isDragging = false"
