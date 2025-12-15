@@ -2,8 +2,9 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { Card } from '@/components/ui/card';
 import Button from '@/components/ui/Button.vue';
+import ToolButton from '@/components/ui/ToolButton.vue';
 import DropZone from '@/components/ui/DropZone.vue';
-import { Upload, Download, Copy, RefreshCw, FileCode, Check, ArrowRight, Layers, File, X, DownloadCloud, Trash2 } from 'lucide-vue-next';
+import { Upload, Download, Copy, RefreshCw, FileCode, Check, ArrowRight, Layers, File, X, DownloadCloud } from 'lucide-vue-next';
 import { formatSize, generateId, downloadAsZip, downloadBlob } from '@/composables/useFileUtils';
 
 // ========================================
@@ -146,6 +147,32 @@ const clearAll = () => {
   }
 };
 
+// 拖曳上傳處理
+const isDraggingSingle = ref(false);
+
+const handleDragOverSingle = (e: DragEvent) => {
+  e.preventDefault();
+  isDraggingSingle.value = true;
+};
+
+const handleDragLeaveSingle = () => {
+  isDraggingSingle.value = false;
+};
+
+const handleDropSingle = (e: DragEvent) => {
+  e.preventDefault();
+  isDraggingSingle.value = false;
+  const file = e.dataTransfer?.files?.[0];
+  if (file && (file.name.endsWith('.svg') || file.type === 'image/svg+xml')) {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      inputSvg.value = ev.target?.result as string;
+      optimizeSvg();
+    };
+    reader.readAsText(file);
+  }
+};
+
 // ========================================
 // 批量模式狀態
 // ========================================
@@ -235,6 +262,31 @@ const clearBatchItems = () => {
     }
   }
   batchItems.value = [];
+};
+
+// 批量模式拖曳上傳處理
+const isDraggingBatch = ref(false);
+
+const handleDragOverBatch = (e: DragEvent) => {
+  e.preventDefault();
+  isDraggingBatch.value = true;
+};
+
+const handleDragLeaveBatch = () => {
+  isDraggingBatch.value = false;
+};
+
+const handleDropBatch = (e: DragEvent) => {
+  e.preventDefault();
+  isDraggingBatch.value = false;
+  if (e.dataTransfer?.files) {
+    processBatchFiles(e.dataTransfer.files);
+  }
+};
+
+const handleBatchFileInput = (e: Event) => {
+  const files = (e.target as HTMLInputElement).files;
+  if (files) processBatchFiles(files);
 };
 
 // 複製單一項目
@@ -351,14 +403,23 @@ const batchTotalSavings = computed(() => {
       <!-- Action Bar -->
       <div class="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl border border-border bg-card p-4">
         <div class="flex items-center gap-4 w-full sm:w-auto">
-          <div class="relative group">
+          <div 
+            class="relative group"
+            @dragover="handleDragOverSingle"
+            @dragleave="handleDragLeaveSingle"
+            @drop="handleDropSingle"
+          >
             <input
               type="file"
               accept=".svg"
               class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
               @change="handleFileUpload"
             />
-            <Button variant="outline" class="w-full sm:w-auto gap-2">
+            <Button 
+              variant="outline" 
+              class="w-full sm:w-auto gap-2"
+              :class="isDraggingSingle ? 'border-primary bg-primary/10' : ''"
+            >
               <Upload class="h-4 w-4" />
               上傳 SVG
             </Button>
@@ -383,33 +444,25 @@ const batchTotalSavings = computed(() => {
         </div>
         
         <div class="flex items-center gap-2 w-full sm:w-auto">
-          <Button v-if="inputSvg" variant="ghost" size="sm" @click="clearAll" title="清除" class="gap-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors">
-            <Trash2 class="h-3.5 w-3.5" />
-            清除
-          </Button>
-          <Button 
+          <ToolButton 
+            v-if="inputSvg" 
+            type="clear" 
+            label="清除"
+            @click="clearAll" 
+          />
+          <ToolButton 
             v-if="outputSvg" 
-            variant="outline" 
+            type="copy" 
+            label="複製代碼"
+            :copied="showCopied"
             @click="copyToClipboard"
-            class="flex-1 sm:flex-none gap-2"
-          >
-            <div v-if="showCopied" class="flex items-center gap-2 text-chart-2">
-              <Check class="h-4 w-4" />
-              <span>已複製</span>
-            </div>
-            <div v-else class="flex items-center gap-2">
-              <Copy class="h-4 w-4" />
-              <span>複製代碼</span>
-            </div>
-          </Button>
-          <Button 
+          />
+          <ToolButton 
             v-if="outputSvg" 
+            type="download" 
+            label="下載 SVG"
             @click="downloadSvg"
-            class="flex-1 sm:flex-none gap-2 bg-primary text-white hover:bg-primary/90"
-          >
-            <Download class="h-4 w-4" />
-            下載 SVG
-          </Button>
+          />
         </div>
       </div>
 
@@ -492,8 +545,9 @@ const batchTotalSavings = computed(() => {
          ======================================== -->
     <div v-show="activeTab === 'batch'" class="space-y-4">
       
-      <!-- Drop Zone -->
+      <!-- Drop Zone (只在沒有檔案時顯示) -->
       <DropZone
+        v-if="batchItems.length === 0"
         accept=".svg"
         :multiple="true"
         title="批量上傳 SVG 檔案"
@@ -509,19 +563,30 @@ const batchTotalSavings = computed(() => {
       <!-- Action Bar -->
       <div class="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl border border-border bg-card p-4" v-if="batchItems.length > 0">
         <div class="flex items-center gap-4 w-full sm:w-auto">
-          <!-- <div class="relative group">
+          <!-- 上傳按鈕 (支援拖曳) -->
+          <div 
+            class="relative group"
+            @dragover="handleDragOverBatch"
+            @dragleave="handleDragLeaveBatch"
+            @drop="handleDropBatch"
+          >
             <input
               type="file"
               accept=".svg"
               multiple
               class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-              @change="handleBatchFileUpload"
+              @change="handleBatchFileInput"
             />
-            <Button variant="outline" class="w-full sm:w-auto gap-2">
+            <Button 
+              variant="outline" 
+              class="w-full sm:w-auto gap-2"
+              :class="isDraggingBatch ? 'border-primary bg-primary/10' : ''"
+            >
               <Upload class="h-4 w-4" />
-              上傳多個 SVG
+              上傳 SVG
             </Button>
-          </div> -->
+          </div>
+          
           <div class="flex gap-4 text-sm">
             <div class="flex items-center gap-2">
               <span class="text-xs text-muted-foreground">共</span>
@@ -533,11 +598,6 @@ const batchTotalSavings = computed(() => {
               <span class="text-xs text-muted-foreground">總計節省</span>
               <span class="font-medium font-mono text-chart-2">{{ formatSize(batchTotalOriginalSize - batchTotalOptimizedSize) }}</span>
             </div>
-            <!-- <div v-if="batchTotalSavings > 0" class="flex items-center">
-              <span class="rounded-full bg-chart-2/20 px-2 py-0.5 text-xs font-medium text-chart-2">
-                -{{ batchTotalSavings }}%
-              </span>
-            </div> -->
             <div v-if="batchTotalSavings !== 0" class="flex items-center">
               <span 
                 class="rounded-full px-2 py-0.5 text-xs font-medium"
@@ -550,34 +610,25 @@ const batchTotalSavings = computed(() => {
         </div>
         
         <div class="flex items-center gap-2 w-full sm:w-auto">
-          <Button v-if="batchItems.length > 0" variant="ghost" size="icon" @click="clearBatchItems" title="清空全部">
-            <RefreshCw class="h-4 w-4" />
-          </Button>
-          <Button 
+          <ToolButton 
             v-if="batchItems.length > 0" 
-            variant="outline" 
+            type="clear" 
+            @click="clearBatchItems" 
+          />
+          <ToolButton 
+            v-if="batchItems.length > 0" 
+            type="copy" 
+            label="複製全部"
+            :copied="batchShowCopied === 'all'"
             @click="copyAllBatch"
-            class="flex-1 sm:flex-none gap-2"
-          >
-            <div v-if="batchShowCopied === 'all'" class="flex items-center gap-2 text-chart-2">
-              <Check class="h-4 w-4" />
-              <span>已複製全部</span>
-            </div>
-            <div v-else class="flex items-center gap-2">
-              <Copy class="h-4 w-4" />
-              <span>複製全部</span>
-            </div>
-          </Button>
-          <Button 
+          />
+          <ToolButton 
             v-if="batchItems.length > 0" 
+            type="download" 
+            label="下載全部"
+            :loading="isDownloadingAll"
             @click="downloadAllBatch"
-            :disabled="isDownloadingAll"
-            class="flex-1 sm:flex-none gap-2 bg-primary text-white hover:bg-primary/90"
-          >
-            <RefreshCw v-if="isDownloadingAll" class="h-4 w-4 animate-spin" />
-            <Download v-else class="h-4 w-4" />
-            {{ isDownloadingAll ? '打包中...' : '下載全部' }}
-          </Button>
+          />
         </div>
       </div>
 

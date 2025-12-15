@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { Card } from '@/components/ui/card';
 import Button from '@/components/ui/Button.vue';
+import ToolButton from '@/components/ui/ToolButton.vue';
 import DropZone from '@/components/ui/DropZone.vue';
 import { Upload, Download, Copy, Check, Link, QrCode, Image as ImageIcon, RefreshCw, Trash2, Clock } from 'lucide-vue-next';
 import jsQR from 'jsqr';
@@ -314,11 +315,20 @@ const copySvg = async () => {
         <div class="flex flex-col">
           <!-- Success Result -->
           <Card v-if="decodedResult" class="border-border bg-card p-5 flex-1 flex flex-col">
-            <div class="flex items-center gap-2 mb-4">
-              <div class="w-9 h-9 rounded-lg bg-chart-2/20 flex items-center justify-center">
-                <Check class="w-5 h-5 text-chart-2" />
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-2">
+                <div class="w-9 h-9 rounded-lg bg-chart-2/20 flex items-center justify-center">
+                  <Check class="w-5 h-5 text-chart-2" />
+                </div>
+                <h3 class="text-base font-semibold text-foreground">解碼成功！</h3>
               </div>
-              <h3 class="text-base font-semibold text-foreground">解碼成功！</h3>
+              <button 
+                @click="resetDecode" 
+                title="清除"
+                class="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                <Trash2 class="h-4 w-4" />
+              </button>
             </div>
 
             <div class="bg-secondary/50 rounded-lg p-4 mb-4">
@@ -336,10 +346,6 @@ const copySvg = async () => {
                 <Check v-if="showDecodeCopied" class="h-4 w-4" />
                 <Copy v-else class="h-4 w-4" />
                 {{ showDecodeCopied ? '已複製' : '複製內容' }}
-              </Button>
-
-              <Button @click="resetDecode" variant="outline" class="gap-2">
-                <RefreshCw class="h-4 w-4" />
               </Button>
             </div>
           </Card>
@@ -376,10 +382,11 @@ const copySvg = async () => {
             <Clock class="h-4 w-4 text-muted-foreground" />
             歷史記錄
           </div>
-          <Button v-if="decodeHistory.length > 0" variant="ghost" size="sm" @click="clearDecodeHistory" title="清除全部" class="gap-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors">
-            <Trash2 class="h-3.5 w-3.5" />
-            清除全部
-          </Button>
+          <ToolButton 
+            v-if="decodeHistory.length > 0" 
+            type="clear" 
+            @click="clearDecodeHistory" 
+          />
         </div>
 
         <div v-if="decodeHistory.length === 0" class="text-center py-6 text-muted-foreground">
@@ -458,15 +465,17 @@ const copySvg = async () => {
 
         <!-- Actions -->
         <div v-if="generatedSvg" class="grid grid-cols-2 gap-3">
-          <Button @click="downloadSvg" class="gap-2">
-            <Download class="h-4 w-4" />
-            下載 SVG
-          </Button>
-          <Button @click="copySvg" variant="outline" class="gap-2">
-            <Check v-if="showCopied" class="h-4 w-4" />
-            <Copy v-else class="h-4 w-4" />
-            {{ showCopied ? '已複製' : '複製 SVG' }}
-          </Button>
+          <ToolButton 
+            type="download" 
+            label="下載 SVG"
+            @click="downloadSvg"
+          />
+          <ToolButton 
+            type="copy" 
+            label="複製 SVG"
+            :copied="showCopied"
+            @click="copySvg"
+          />
         </div>
       </div>
     </div>

@@ -1,0 +1,12 @@
+---
+import ToolLayout from '@/layouts/ToolLayout.astro';
+import ThemeLoader from '@/components/tools/ThemeLoader.vue';
+---
+
+<ToolLayout title="Template Color">
+  <ThemeLoader client:load />
+  
+  <p slot="footer" class="text-center text-xs text-muted-foreground mt-8">
+    自動讀取 theme 資料夾內的模板配色，快速預覽與產生 CSS 變數
+  </p>
+</ToolLayout>

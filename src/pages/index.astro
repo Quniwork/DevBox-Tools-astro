@@ -1,21 +1,21 @@
 ---
 import Layout from '@/layouts/Layout.astro';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Globe, FileImage, Palette, QrCode, ArrowRight, Terminal, Code, Image } from 'lucide-vue-next';
+import { Globe, FileImage, Palette, QrCode, ArrowRight, Terminal, Code, Image, Link } from 'lucide-vue-next';
 import ThemeSwitcher from '@/components/ThemeSwitcher.vue';
 
 const tools = [
-  {
-    title: "包網小工具",
-    description: "BBIN Partner 相關工具集合",
-    icon: Globe,
-    href: "/tools/partner"
-  },
   {
     title: "配色轉換",
     description: "Figma 到 Layout 配色轉換",
     icon: Palette,
     href: "/tools/theme"
+  },
+  {
+    title: "JSON 轉換",
+    description: "Figma JSON 轉 CSS 變數",
+    icon: Code,
+    href: "/tools/converter"
   },
   {
     title: "SVG 優化",
@@ -36,10 +36,10 @@ const tools = [
     href: "/tools/qrcode"
   },
   {
-    title: "Semantic 轉換",
-    description: "Figma JSON 轉 CSS 變數",
-    icon: Code,
-    href: "/tools/semantic"
+    title: "短網址",
+    description: "長網址轉換為短網址",
+    icon: Link,
+    href: "/tools/shortener"
   }
 ];
 ---

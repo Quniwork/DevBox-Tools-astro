@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { Card } from '@/components/ui/card';
 import Button from '@/components/ui/Button.vue';
+import ToolButton from '@/components/ui/ToolButton.vue';
 import DropZone from '@/components/ui/DropZone.vue';
 import { Upload, Download, Trash2, RefreshCw, Layers, Image, X, Settings2, Check, FileCode } from 'lucide-vue-next';
 import { formatSize, generateId, downloadAsZip, downloadBlob } from '@/composables/useFileUtils';
@@ -276,6 +277,31 @@ const clearAll = () => {
   items.value = [];
 };
 
+// 拖曳上傳處理
+const isDraggingImage = ref(false);
+
+const handleDragOverImage = (e: DragEvent) => {
+  e.preventDefault();
+  isDraggingImage.value = true;
+};
+
+const handleDragLeaveImage = () => {
+  isDraggingImage.value = false;
+};
+
+const handleDropImage = (e: DragEvent) => {
+  e.preventDefault();
+  isDraggingImage.value = false;
+  if (e.dataTransfer?.files) {
+    processFiles(e.dataTransfer.files);
+  }
+};
+
+const handleImageFileInput = (e: Event) => {
+  const files = (e.target as HTMLInputElement).files;
+  if (files) processFiles(files);
+};
+
 // 下載單一項目
 const downloadItem = (item: ImageItem) => {
   if (!item.convertedBlob) return;
@@ -444,6 +470,30 @@ const closePreview = () => {
     <!-- Action Bar -->
     <div class="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl border border-border bg-card p-4" v-if="items.length > 0">
       <div class="flex items-center gap-4 w-full sm:w-auto">
+        <!-- 上傳按鈕 (支援拖曳) -->
+        <div 
+          class="relative group"
+          @dragover="handleDragOverImage"
+          @dragleave="handleDragLeaveImage"
+          @drop="handleDropImage"
+        >
+          <input
+            type="file"
+            :accept="CONFIG.ACCEPTED_EXTENSIONS"
+            multiple
+            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+            @change="handleImageFileInput"
+          />
+          <Button 
+            variant="outline" 
+            class="w-full sm:w-auto gap-2"
+            :class="isDraggingImage ? 'border-primary bg-primary/10' : ''"
+          >
+            <Upload class="h-4 w-4" />
+            上傳圖片
+          </Button>
+        </div>
+        
         <div class="flex items-center gap-4 text-sm">
           <div class="flex items-center gap-2">
             <span class="text-xs text-muted-foreground">共</span>
@@ -469,25 +519,24 @@ const closePreview = () => {
       </div>
       
       <div class="flex items-center gap-2 w-full sm:w-auto">
-        <Button v-if="items.length > 0" variant="ghost" size="sm" @click="clearAll" title="清除全部" class="gap-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors">
-          <Trash2 class="h-3.5 w-3.5" />
-          清除全部
-        </Button>
-        <Button 
+        <ToolButton 
+          v-if="items.length > 0" 
+          type="clear" 
+          @click="clearAll" 
+        />
+        <ToolButton 
           v-if="doneCount > 0" 
+          type="download" 
+          label="下載全部"
+          :loading="isDownloadingAll"
           @click="downloadAll"
-          :disabled="isDownloadingAll"
-          class="flex-1 sm:flex-none gap-2 bg-primary text-white hover:bg-primary/90"
-        >
-          <RefreshCw v-if="isDownloadingAll" class="h-4 w-4 animate-spin" />
-          <Download v-else class="h-4 w-4" />
-          {{ isDownloadingAll ? '打包中...' : '下載全部' }}
-        </Button>
+        />
       </div>
     </div>
 
-    <!-- Drop Zone -->
+    <!-- Drop Zone (只在沒有檔案時顯示) -->
     <DropZone
+      v-if="items.length === 0"
       :accept="CONFIG.ACCEPTED_EXTENSIONS"
       :multiple="true"
       title="批量上傳圖片進行轉換"
