@@ -4,8 +4,8 @@ import { Card } from '@/components/ui/card';
 import Button from '@/components/ui/Button.vue';
 import ToolButton from '@/components/ui/ToolButton.vue';
 import DropZone from '@/components/ui/DropZone.vue';
-import { Upload, Download, Trash2, RefreshCw, Layers, Image, X, Settings2, Check, FileCode } from 'lucide-vue-next';
-import { formatSize, generateId, downloadAsZip, downloadBlob } from '@/composables/useFileUtils';
+import { Upload, Download, RefreshCw, Layers, Image, X, Settings2, Check, FileCode } from 'lucide-vue-next';
+import { formatSize, generateId } from '@/composables/useFileUtils';
 
 // ========================================
 // 配置區 (CONFIG)
@@ -55,6 +55,8 @@ const isMounted = ref(false);
 
 onMounted(() => {
   isMounted.value = true;
+  // Initialize slider background
+  updateSliderBackground();
 });
 
 // 設定
@@ -78,6 +80,16 @@ if (typeof window !== 'undefined') {
     enableCompress.value = savedCompress === 'true';
   }
 }
+
+// Watch changes to update slider background
+import { watch } from 'vue';
+watch(quality, () => {
+    updateSliderBackground();
+});
+
+const updateSliderBackground = () => {
+    // This function is largely handled by inline style now, but kept for logic if needed
+};
 
 // ========================================
 // 計算屬性
@@ -104,11 +116,11 @@ const totalSavings = computed(() => {
 });
 
 const doneCount = computed(() => items.value.filter(item => item.status === 'done').length);
+const qualityPercent = computed(() => Math.round(quality.value * 100));
 
 // ========================================
 // 工具函式
 // ========================================
-// formatSize 和 generateId 已從 @/composables/useFileUtils 引入
 
 // 儲存設定到 localStorage
 const saveSettings = () => {
@@ -124,6 +136,19 @@ const saveSettings = () => {
 // ========================================
 const convertImage = async (item: ImageItem): Promise<void> => {
   return new Promise((resolve, reject) => {
+    const isSameFormat = item.file.type === selectedFormat.value;
+    const isNoCompression = !enableCompress.value || (enableCompress.value && quality.value === 1);
+    
+    if (isSameFormat && isNoCompression) {
+        // 直接複製原始檔案
+        item.convertedBlob = item.file;
+        item.convertedUrl = URL.createObjectURL(item.file);
+        item.convertedSize = item.file.size;
+        item.status = 'done';
+        resolve();
+        return;
+    }
+
     const img = new window.Image();
     img.onload = () => {
       try {
@@ -137,7 +162,7 @@ const convertImage = async (item: ImageItem): Promise<void> => {
           return;
         }
         
-        // 如果輸出格式是 JPG，需要先填充白色背景（因為 JPG 不支援透明）
+        // 如果輸出格式是 JPG，需要先填充白色背景
         if (selectedFormat.value === 'image/jpeg') {
           ctx.fillStyle = '#FFFFFF';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -145,13 +170,11 @@ const convertImage = async (item: ImageItem): Promise<void> => {
         
         ctx.drawImage(img, 0, 0);
         
-        // 決定品質參數
         const outputQuality = enableCompress.value ? quality.value : 1;
         
         canvas.toBlob(
           (blob) => {
             if (blob) {
-              // 清理舊的 URL
               if (item.convertedUrl) {
                 URL.revokeObjectURL(item.convertedUrl);
               }
@@ -182,17 +205,16 @@ const convertImage = async (item: ImageItem): Promise<void> => {
 };
 
 // ========================================
-// 檔案處理
+// 檔案掃描與處理 (Drag & Drop Logic)
 // ========================================
-const processFiles = async (files: FileList | File[]) => {
-  const fileArray = Array.from(files);
-  
-  for (const file of fileArray) {
-    // 驗證檔案類型
+const processFiles = async (files: File[]) => {
+  for (const file of files) {
     if (!CONFIG.ACCEPTED_TYPES.includes(file.type) && !file.name.match(/\.(jpg|jpeg|png|webp|gif|bmp|avif)$/i)) {
       continue;
     }
     
+    if (items.value.some(i => i.name === file.name && i.originalSize === file.size)) continue;
+
     const item: ImageItem = {
       id: generateId(),
       file: file,
@@ -208,17 +230,44 @@ const processFiles = async (files: FileList | File[]) => {
     items.value.push(item);
   }
   
-  // 儲存設定
   saveSettings();
-  
-  // 自動開始轉換
   await processAllPending();
 };
 
-// 處理所有待處理項目
+const handleImageFileInput = (e: Event) => {
+    const input = e.target as HTMLInputElement;
+    if (input.files) {
+        processFiles(Array.from(input.files));
+    }
+    input.value = ''; 
+};
+
+const scanFiles = async (entry: any): Promise<File[]> => {
+    if (entry.isFile) {
+        return new Promise((resolve) => {
+            entry.file((file: File) => resolve([file]));
+        });
+    } else if (entry.isDirectory) {
+        const dirReader = entry.createReader();
+        const entries = await new Promise<any[]>((resolve, reject) => {
+            dirReader.readEntries(
+                (results: any[]) => resolve(results),
+                (err: any) => reject(err)
+            );
+        });
+        
+        const files: File[] = [];
+        for (const child of entries) {
+            const childFiles = await scanFiles(child);
+            files.push(...childFiles);
+        }
+        return files;
+    }
+    return [];
+};
+
 const processAllPending = async () => {
   isProcessing.value = true;
-  
   for (const item of items.value) {
     if (item.status === 'pending') {
       item.status = 'converting';
@@ -230,18 +279,13 @@ const processAllPending = async () => {
       }
     }
   }
-  
   isProcessing.value = false;
 };
 
-// 重新轉換所有項目（當格式或品質改變時）
 const reconvertAll = async () => {
   saveSettings();
-  
-  // 將所有 done 的項目重置為 pending
   for (const item of items.value) {
     if (item.status === 'done' || item.status === 'error') {
-      // 清理舊的 converted URL
       if (item.convertedUrl) {
         URL.revokeObjectURL(item.convertedUrl);
         item.convertedUrl = '';
@@ -251,33 +295,10 @@ const reconvertAll = async () => {
       item.status = 'pending';
     }
   }
-  
   await processAllPending();
 };
 
-// ========================================
-// 項目操作
-// ========================================
-const removeItem = (id: string) => {
-  const item = items.value.find(i => i.id === id);
-  if (item) {
-    // 清理 URL
-    if (item.originalUrl) URL.revokeObjectURL(item.originalUrl);
-    if (item.convertedUrl) URL.revokeObjectURL(item.convertedUrl);
-  }
-  items.value = items.value.filter(i => i.id !== id);
-};
-
-const clearAll = () => {
-  // 清理所有 URL
-  for (const item of items.value) {
-    if (item.originalUrl) URL.revokeObjectURL(item.originalUrl);
-    if (item.convertedUrl) URL.revokeObjectURL(item.convertedUrl);
-  }
-  items.value = [];
-};
-
-// 拖曳上傳處理
+// Drag Drop Handlers
 const isDraggingImage = ref(false);
 
 const handleDragOverImage = (e: DragEvent) => {
@@ -289,26 +310,50 @@ const handleDragLeaveImage = () => {
   isDraggingImage.value = false;
 };
 
-const handleDropImage = (e: DragEvent) => {
+const handleDropImage = async (e: DragEvent) => {
   e.preventDefault();
   isDraggingImage.value = false;
-  if (e.dataTransfer?.files) {
-    processFiles(e.dataTransfer.files);
+  
+  const itemsList = e.dataTransfer?.items;
+  if (itemsList) {
+      const allFiles: File[] = [];
+      for (let i = 0; i < itemsList.length; i++) {
+          const item = itemsList[i].webkitGetAsEntry ? itemsList[i].webkitGetAsEntry() : null;
+          if (item) {
+              const scanned = await scanFiles(item);
+              allFiles.push(...scanned);
+          } else {
+              const f = itemsList[i].getAsFile();
+              if (f) allFiles.push(f);
+          }
+      }
+      processFiles(allFiles);
+  } else if (e.dataTransfer?.files) {
+      processFiles(Array.from(e.dataTransfer.files));
   }
 };
 
-const handleImageFileInput = (e: Event) => {
-  const files = (e.target as HTMLInputElement).files;
-  if (files) processFiles(files);
+const removeItem = (id: string) => {
+  const item = items.value.find(i => i.id === id);
+  if (item) {
+    if (item.originalUrl) URL.revokeObjectURL(item.originalUrl);
+    if (item.convertedUrl) URL.revokeObjectURL(item.convertedUrl);
+  }
+  items.value = items.value.filter(i => i.id !== id);
 };
 
-// 下載單一項目
+const clearAll = () => {
+  for (const item of items.value) {
+    if (item.originalUrl) URL.revokeObjectURL(item.originalUrl);
+    if (item.convertedUrl) URL.revokeObjectURL(item.convertedUrl);
+  }
+  items.value = [];
+};
+
 const downloadItem = (item: ImageItem) => {
   if (!item.convertedBlob) return;
-  
   const ext = currentFormatInfo.value.extension;
   const baseName = item.name.replace(/\.[^.]+$/, '');
-  
   const url = URL.createObjectURL(item.convertedBlob);
   const a = document.createElement('a');
   a.href = url;
@@ -317,29 +362,21 @@ const downloadItem = (item: ImageItem) => {
   URL.revokeObjectURL(url);
 };
 
-// 下載全部（打包成 ZIP）
 const downloadAll = async () => {
   const doneItems = items.value.filter(item => item.status === 'done' && item.convertedBlob);
   if (doneItems.length === 0) return;
   
   isDownloadingAll.value = true;
-  
   try {
-    // 動態載入 JSZip
     const JSZip = (await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm')).default;
     const zip = new JSZip();
-    
     const ext = currentFormatInfo.value.extension;
-    
-    // 將每個圖片加入 ZIP
     for (const item of doneItems) {
       if (item.convertedBlob) {
         const baseName = item.name.replace(/\.[^.]+$/, '');
         zip.file(`${baseName}.${ext}`, item.convertedBlob);
       }
     }
-    
-    // 產生 ZIP 並下載
     const content = await zip.generateAsync({ type: 'blob' });
     const url = URL.createObjectURL(content);
     const a = document.createElement('a');
@@ -350,7 +387,6 @@ const downloadAll = async () => {
     URL.revokeObjectURL(url);
   } catch (error) {
     console.error('ZIP 下載失敗:', error);
-    // 如果 JSZip 載入失敗，改用逐一下載
     doneItems.forEach((item, index) => {
       setTimeout(() => downloadItem(item), index * 200);
     });
@@ -359,14 +395,6 @@ const downloadAll = async () => {
   }
 };
 
-// ========================================
-// 品質滑桿格式化
-// ========================================
-const qualityPercent = computed(() => Math.round(quality.value * 100));
-
-// ========================================
-// Modal 預覽
-// ========================================
 const openPreview = (item: ImageItem) => {
   previewItem.value = item;
   previewMode.value = item.status === 'done' ? 'converted' : 'original';
@@ -378,8 +406,7 @@ const closePreview = () => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-4">
-
+  <div class="flex flex-col gap-6">
     <div class="flex flex-col md:flex-row gap-4">
       <!-- Settings Panel -->
       <Card class="p-4 space-y-4 md:flex-[2]">
@@ -387,7 +414,6 @@ const closePreview = () => {
           <Settings2 class="h-4 w-4" />
           輸出格式
         </div>
-
         <div class="grid grid-cols-2 lg:grid-cols-3 gap-2">
           <button
             v-for="format in CONFIG.OUTPUT_FORMATS"
@@ -419,7 +445,6 @@ const closePreview = () => {
           </button>
         </div>
       </Card>
-  
       <Card class="p-4 space-y-4 md:flex-1">
         <div class="flex justify-between">
           <div class="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-0">
@@ -438,60 +463,64 @@ const closePreview = () => {
             </label>
           </div>
         </div>
-  
-        <!-- Compression Settings -->
- 
-          <div class="flex items-center justify-between text-sm mb-0">
-            <span class="text-muted-foreground">品質</span>
-            <span class="font-mono font-medium text-foreground">{{ qualityPercent }}%</span>
-          </div>
-          <input
-            type="range"
-            min="0.1"
-            max="1"
-            step="0.05"
-            v-model.number="quality"
-            @change="reconvertAll()"
-            :disabled="!enableCompress"
-            class="quality-slider w-full"
-          />
-          <div class="flex justify-between text-muted-foreground/60 text-xs text-muted-foreground">
-            <span>檔案較小</span>
-            <span>品質優先</span>
-          </div>
-          
-          <!-- <p class="text-xs text-muted-foreground bg-secondary/50 rounded-lg p-2">
-            {{ enableCompress ? '有損壓縮可大幅減少檔案大小，但可能略微降低畫質' : 'PNG 格式無損，其他格式將使用最高品質' }}
-          </p> -->
+        <div class="flex items-center justify-between text-sm mb-0">
+          <span class="text-muted-foreground">品質</span>
+          <span class="font-mono font-medium text-foreground">{{ qualityPercent }}%</span>
+        </div>
+        
+        <!-- Custom Slider with Linear Gradient -->
+        <div class="relative w-full h-6 flex items-center">
+             <input
+                type="range"
+                min="0.1"
+                max="1"
+                step="0.05"
+                v-model.number="quality"
+                @change="reconvertAll()"
+                :disabled="!enableCompress"
+                class="quality-slider w-full h-2 bg-secondary rounded-full appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                :style="{ 
+                    backgroundImage: `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) 100%)`,
+                    backgroundSize: `${qualityPercent}% 100%`,
+                    backgroundRepeat: 'no-repeat'
+                }"
+            />
+        </div>
+
+        <div class="flex justify-between text-muted-foreground/60 text-xs text-muted-foreground">
+          <span>檔案較小</span>
+          <span>品質優先</span>
+        </div>
       </Card>
     </div>
 
-
-    <!-- Action Bar -->
+    <!-- Action Bar & Stats (Merged Style) -->
     <div class="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl border border-border bg-card p-4" v-if="items.length > 0">
       <div class="flex items-center gap-4 w-full sm:w-auto">
-        <!-- 上傳按鈕 (支援拖曳) -->
+        <!-- Unified Upload Button -->
         <div 
-          class="relative group"
+          class="relative group w-full sm:w-auto"
           @dragover="handleDragOverImage"
           @dragleave="handleDragLeaveImage"
           @drop="handleDropImage"
         >
-          <input
-            type="file"
-            :accept="CONFIG.ACCEPTED_EXTENSIONS"
-            multiple
-            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-            @change="handleImageFileInput"
-          />
-          <Button 
-            variant="outline" 
-            class="w-full sm:w-auto gap-2"
-            :class="isDraggingImage ? 'border-primary bg-primary/10' : ''"
-          >
-            <Upload class="h-4 w-4" />
-            上傳圖片
-          </Button>
+             <!-- Accepts Directory Selection (User requested merge, following ImageCheckTool pattern) -->
+             <input
+                type="file"
+                webkitdirectory
+                directory
+                multiple
+                class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                @change="handleImageFileInput"
+            />
+            <Button 
+                variant="outline" 
+                class="w-full sm:w-auto gap-2"
+                :class="isDraggingImage ? 'border-primary bg-primary/10' : ''"
+            >
+                <Upload class="h-4 w-4" />
+                上傳資料夾或圖片
+            </Button>
         </div>
         
         <div class="flex items-center gap-4 text-sm">
@@ -518,7 +547,7 @@ const closePreview = () => {
         </div>
       </div>
       
-      <div class="flex items-center gap-2 w-full sm:w-auto">
+      <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
         <ToolButton 
           v-if="items.length > 0" 
           type="clear" 
@@ -534,14 +563,14 @@ const closePreview = () => {
       </div>
     </div>
 
-    <!-- Drop Zone (只在沒有檔案時顯示) -->
+    <!-- Drop Zone -->
     <DropZone
       v-if="items.length === 0"
       :accept="CONFIG.ACCEPTED_EXTENSIONS"
       :multiple="true"
       title="批量上傳圖片進行轉換"
-      subtitle="拖放圖片到這裡，或點擊選擇檔案"
-      hint="支援 JPG、PNG、WebP、GIF、BMP、AVIF"
+      subtitle="拖放圖片或資料夾到這裡"
+      hint="支援 JPG、PNG、WebP、GIF 等格式"
       @files="processFiles"
     >
       <template #icon>
@@ -549,91 +578,112 @@ const closePreview = () => {
       </template>
     </DropZone>
 
-    <!-- Items List -->
-    <div v-if="items.length > 0" class="space-y-2">
-      <div 
-        v-for="item in items" 
-        :key="item.id"
-        class="flex items-center gap-4 p-4 rounded-xl border border-border bg-card group"
-      >
-        <!-- Preview Thumbnail -->
-        <div 
-          class="w-14 h-14 rounded-lg overflow-hidden bg-secondary shrink-0 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
-          @click="openPreview(item)"
-          title="點擊預覽"
-        >
-          <img 
-            :src="item.status === 'done' ? item.convertedUrl : item.originalUrl" 
-            :alt="item.name"
-            class="w-full h-full object-cover"
-          />
-        </div>
+    <!-- Items List (Table Style) -->
+    <Card v-if="items.length > 0" class="bg-card overflow-hidden">
+        <table class="w-full text-sm text-left">
+            <thead class="bg-muted/50 text-muted-foreground font-medium border-b border-border">
+                <tr>
+                    <th class="px-4 py-3 w-[45%]">檔案名稱</th>
+                    <th class="px-4 py-3 text-right w-[15%]">原始大小</th>
+                    <th class="px-4 py-3 text-right w-[25%]">優化後大小</th>
+                    <th class="px-4 py-3 text-right w-[15%]">操作</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-border">
+                <tr v-for="item in items" :key="item.id" class="hover:bg-muted/50 transition-colors group">
+                    <td class="px-4 py-3">
+                        <div class="flex items-center gap-3">
+                            <!-- Thumbnail -->
+                            <div 
+                                class="w-10 h-10 rounded overflow-hidden bg-secondary shrink-0 cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
+                                @click="openPreview(item)"
+                                title="點擊預覽"
+                            >
+                                <img 
+                                    :src="item.status === 'done' ? item.convertedUrl : item.originalUrl" 
+                                    :alt="item.name"
+                                    class="w-full h-full object-cover"
+                                />
+                            </div>
+                            
+                            <!-- Name Info -->
+                            <div class="min-w-0">
+                                <div class="font-medium text-foreground truncate max-w-[200px] sm:max-w-xs">{{ item.name }}</div>
+                                <div class="flex items-center gap-2 mt-0.5" v-if="item.status === 'error'">
+                                    <span class="text-[10px] px-1.5 rounded-full bg-destructive/10 text-destructive font-medium">
+                                        {{ item.error || '錯誤' }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                    
+                    <td class="px-4 py-3 text-right font-mono text-muted-foreground">
+                        {{ formatSize(item.originalSize) }}
+                    </td>
+                    
+                    <td class="px-4 py-3 text-right">
+                         <div v-if="item.status === 'converting'" class="flex items-center justify-end gap-1 text-primary">
+                             <RefreshCw class="w-3 h-3 animate-spin" />
+                             <span class="text-xs">處理中...</span>
+                         </div>
+                         <div v-else-if="item.status === 'done'" class="flex items-center justify-end gap-2">
+                             <span 
+                                class="font-mono font-medium" 
+                                :class="item.convertedSize < item.originalSize ? 'text-chart-2' : 'text-muted-foreground'"
+                             >
+                                {{ formatSize(item.convertedSize) }}
+                             </span>
+                             <span 
+                                v-if="item.convertedSize < item.originalSize"
+                                class="text-[10px] px-1.5 py-0.5 rounded-full bg-chart-2/10 text-chart-2 font-medium"
+                             >
+                                -{{ Math.abs(Math.round(((item.originalSize - item.convertedSize) / item.originalSize) * 100)) }}%
+                             </span>
+                         </div>
+                         <div v-else class="text-muted-foreground text-xs opacity-50">-</div>
+                    </td>
+                    
+                    <td class="px-4 py-3 text-right">
+                        <div class="flex items-center justify-end gap-1">
+                             <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                class="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                title="預覽"
+                                @click="openPreview(item)"
+                            >
+                                <Image class="h-4 w-4" />
+                            </Button>
+                            
+                            <Button 
+                                v-if="item.status === 'done'"
+                                variant="ghost" 
+                                size="icon" 
+                                class="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                @click="downloadItem(item)"
+                                title="下載"
+                            >
+                                <Download class="h-4 w-4" />
+                            </Button>
+                            
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                class="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                @click="removeItem(item.id)"
+                                title="移除"
+                            >
+                                <X class="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </Card>
 
-        <!-- File Info -->
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2 mb-1">
-            <Image class="h-4 w-4 text-muted-foreground shrink-0" />
-            <span class="text-sm font-medium text-foreground truncate">{{ item.name }}</span>
-            
-            <!-- Status Badge -->
-            <span 
-              v-if="item.status === 'converting'"
-              class="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary font-medium flex items-center gap-1"
-            >
-              <RefreshCw class="h-3 w-3 animate-spin" />
-              轉換中
-            </span>
-            <span 
-              v-else-if="item.status === 'error'"
-              class="text-[10px] px-1.5 py-0.5 rounded-full bg-destructive/20 text-destructive font-medium"
-            >
-              {{ item.error || '錯誤' }}
-            </span>
-          </div>
-          
-          <div class="flex items-center gap-3 text-xs text-muted-foreground">
-            <span class="font-mono">{{ formatSize(item.originalSize) }}</span>
-            <template v-if="item.status === 'done'">
-              <span>→</span>
-              <span class="font-mono" :class="item.convertedSize < item.originalSize ? 'text-chart-2' : 'text-destructive'">
-                {{ formatSize(item.convertedSize) }}
-              </span>
-              <span 
-                class="rounded-full px-1.5 py-0.5 text-[10px] font-medium"
-                :class="item.convertedSize < item.originalSize ? 'bg-chart-2/20 text-chart-2' : 'bg-destructive/20 text-destructive'"
-              >
-                {{ item.convertedSize < item.originalSize ? '-' : '+' }}{{ Math.abs(Math.round(((item.originalSize - item.convertedSize) / item.originalSize) * 100)) }}%
-              </span>
-            </template>
-          </div>
-        </div>
-
-        <!-- Actions -->
-        <div class="flex items-center gap-1 shrink-0">
-          <Button 
-            v-if="item.status === 'done'"
-            variant="ghost" 
-            size="icon" 
-            @click="downloadItem(item)"
-            class="h-8 w-8"
-            title="下載"
-          >
-            <Download class="h-4 w-4" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            @click="removeItem(item.id)"
-            class="h-8 w-8 text-muted-foreground hover:text-destructive"
-            title="移除"
-          >
-            <X class="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Preview Modal (僅在客戶端 mounted 後渲染，避免 SSR hydration mismatch) -->
+    <!-- Preview Modal -->
     <Teleport v-if="isMounted" to="body">
       <Transition name="modal">
         <div 
@@ -641,20 +691,14 @@ const closePreview = () => {
           class="fixed inset-0 z-50 flex items-center justify-center p-4"
           @click.self="closePreview"
         >
-          <!-- Backdrop -->
           <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" @click="closePreview"></div>
-          
-          <!-- Modal Content -->
           <div class="relative z-10 max-w-[90vw] max-h-[90vh] flex flex-col">
-            <!-- Close Button -->
             <button 
               @click="closePreview"
               class="absolute -top-10 right-0 text-white/70 hover:text-white transition-colors"
             >
               <X class="h-6 w-6" />
             </button>
-            
-            <!-- Image -->
             <div class="rounded-xl overflow-hidden bg-card shadow-2xl">
               <img 
                 :src="previewMode === 'converted' && previewItem.status === 'done' ? previewItem.convertedUrl : previewItem.originalUrl" 
@@ -662,35 +706,20 @@ const closePreview = () => {
                 class="max-w-full max-h-[75vh] object-contain"
               />
             </div>
-            
-            <!-- Info Bar -->
             <div class="mt-3 flex items-center justify-between gap-4 px-1">
-              <!-- File Name -->
               <div class="text-white text-sm font-medium truncate">
                 {{ previewItem.name }}
               </div>
-              
-              <!-- Toggle Buttons (僅當有轉換結果時顯示) -->
               <div v-if="previewItem.status === 'done'" class="flex items-center gap-2 shrink-0">
                 <button 
                   @click="previewMode = 'original'"
-                  :class="[
-                    'px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
-                    previewMode === 'original' 
-                      ? 'bg-white text-black' 
-                      : 'bg-white/20 text-white hover:bg-white/30'
-                  ]"
+                  :class="[ 'px-3 py-1.5 rounded-lg text-xs font-medium transition-all', previewMode === 'original' ? 'bg-white text-black' : 'bg-white/20 text-white hover:bg-white/30' ]"
                 >
                   原圖 {{ formatSize(previewItem.originalSize) }}
                 </button>
                 <button 
                   @click="previewMode = 'converted'"
-                  :class="[
-                    'px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
-                    previewMode === 'converted' 
-                      ? 'bg-chart-2 text-white' 
-                      : 'bg-white/20 text-white hover:bg-white/30'
-                  ]"
+                  :class="[ 'px-3 py-1.5 rounded-lg text-xs font-medium transition-all', previewMode === 'converted' ? 'bg-chart-2 text-white' : 'bg-white/20 text-white hover:bg-white/30' ]"
                 >
                   轉換後 {{ formatSize(previewItem.convertedSize) }}
                   <span class="ml-1 opacity-80">(-{{ Math.round(((previewItem.originalSize - previewItem.convertedSize) / previewItem.originalSize) * 100) }}%)</span>
@@ -703,3 +732,30 @@ const closePreview = () => {
     </Teleport>
   </div>
 </template>
+
+<style scoped>
+.quality-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: white;
+  border: 4px solid hsl(var(--primary));
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 0 2px hsl(var(--background));
+  transition: transform 0.1s;
+}
+.quality-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+.quality-slider:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px hsl(var(--primary) / 0.3);
+}
+.modal-enter-active, .modal-leave-active {
+  transition: opacity 0.3s ease;
+}
+.modal-enter-from, .modal-leave-to {
+  opacity: 0;
+}
+</style>

@@ -17,6 +17,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "jsqr": "^1.4.0",
+    "jszip": "^3.10.1",
     "lucide-vue-next": "^0.556.0",
     "qrcode-svg": "^1.1.0",
     "tailwind-merge": "^3.4.0",

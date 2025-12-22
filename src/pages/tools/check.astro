@@ -1,0 +1,8 @@
+---
+import ToolLayout from '../../layouts/ToolLayout.astro';
+import ImageCheckTool from '../../components/tools/ImageCheckTool.vue';
+---
+
+<ToolLayout title="圖片大小檢查" description="批次檢查資料夾內所有圖片是否超過 600KB">
+  <ImageCheckTool client:load />
+</ToolLayout>

@@ -1,7 +1,7 @@
 ---
 import Layout from '@/layouts/Layout.astro';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Globe, FileImage, Palette, QrCode, ArrowRight, Terminal, Code, Image, Link } from 'lucide-vue-next';
+import { Globe, FileImage, Palette, QrCode, ArrowRight, Terminal, Code, Image, Link, ListOrdered, FolderSearch } from 'lucide-vue-next';
 import ThemeSwitcher from '@/components/ThemeSwitcher.vue';
 
 const tools = [
@@ -28,6 +28,18 @@ const tools = [
     description: "圖片格式轉換與壓縮",
     icon: Image,
     href: "/tools/image"
+  },
+  {
+      title: "圖片命名排序",
+      description: "圖片排序與自訂命名",
+      icon: ListOrdered,
+      href: "/tools/renamer"
+  },
+  {
+      title: "圖片大小檢查",
+      description: "批次檢查資料夾內圖片大小",
+      icon: FolderSearch,
+      href: "/tools/check"
   },
   {
     title: "QR Code",
@@ -224,5 +236,7 @@ const tools = [
     .tool-card:nth-child(4) { animation-delay: 0.4s; }
     .tool-card:nth-child(5) { animation-delay: 0.5s; }
     .tool-card:nth-child(6) { animation-delay: 0.6s; }
+    .tool-card:nth-child(7) { animation-delay: 0.7s; }
+    .tool-card:nth-child(8) { animation-delay: 0.8s; }
   </style>
 </Layout>
