@@ -390,8 +390,8 @@ const handleDrop = (e: DragEvent) => {
 <template>
   <div class="space-y-4">
     <!-- Action Bar -->
-    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl border border-border bg-card p-4">
-      <div class="flex items-center gap-4 w-full sm:w-auto">
+    <div class="tool-action-bar">
+      <div class="tool-action-left">
         <div 
           class="relative group"
           @dragover="handleDragOver"
@@ -423,7 +423,7 @@ const handleDrop = (e: DragEvent) => {
         </div>
       </div>
       
-      <div class="flex items-center gap-2 w-full sm:w-auto">
+      <div class="tool-action-right">
         <ToolButton 
           v-if="loadedFiles.length > 0" 
           type="clear" 

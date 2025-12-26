@@ -512,21 +512,21 @@ const getCanvasBlob = (img: HTMLImageElement, quality: number, scale: number = 1
     <!-- Empty State -->
     <Card 
         v-if="images.length === 0"
-        class="border-2 border-dashed transition-colors duration-200"
-        :class="isDragOver ? 'border-primary bg-primary/5' : 'border-border bg-card'"
+        class="tool-dropzone"
+        :class="isDragOver ? 'tool-dropzone-active' : 'tool-dropzone-inactive'"
         @dragenter="handleDragOverZone"
         @dragover="handleDragOverZone"
         @dragleave="handleDragLeaveZone"
         @drop="handleDropZone"
     >
-        <CardContent class="flex flex-col items-center justify-center py-12 text-center space-y-4">
-            <div class="p-4 bg-primary/10 rounded-full">
-                <FolderSearch v-if="!isDragOver" class="w-10 h-10 text-primary" />
-                <Upload v-else class="w-10 h-10 text-primary" />
+        <div class="tool-dropzone-content">
+            <div class="tool-dropzone-icon-wrapper">
+                <FolderSearch v-if="!isDragOver" class="w-10 h-10" />
+                <Upload v-else class="w-10 h-10" />
             </div>
             <div class="space-y-2">
-                <h3 class="text-xl font-semibold">圖片排序與命名</h3>
-                <p class="text-sm text-muted-foreground max-w-sm mx-auto">
+                <h3 class="tool-dropzone-title">圖片排序與命名</h3>
+                <p class="tool-dropzone-description">
                     拖曳圖片至此 或 點擊選擇<br/>
                     <span class="text-xs opacity-70">支援多選，自動轉為 JPG</span>
                 </p>
@@ -546,12 +546,12 @@ const getCanvasBlob = (img: HTMLImageElement, quality: number, scale: number = 1
                     />
                 </div>
             </div>
-        </CardContent>
+        </div>
     </Card>
 
     <!-- Action Bar (When Files Exist) -->
-    <div v-else class="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl border border-border bg-card p-4 shadow-sm">
-         <div class="flex items-center gap-3 w-full sm:w-auto">
+    <div v-else class="tool-action-bar">
+         <div class="tool-action-left">
              <div class="relative group w-full sm:w-auto">
                  <input
                     type="file"
@@ -570,14 +570,14 @@ const getCanvasBlob = (img: HTMLImageElement, quality: number, scale: number = 1
                 </Button>
              </div>
              
-             <div class="h-6 w-px bg-border mx-1 hidden sm:block"></div>
+             <div class="tool-action-separator"></div>
              
              <div class="flex items-center gap-2 text-sm">
                  <span class="font-medium">{{ images.length }} 張圖片</span>
              </div>
          </div>
          
-         <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+         <div class="tool-action-right">
              <ToolButton 
               type="clear" 
               label="清空"

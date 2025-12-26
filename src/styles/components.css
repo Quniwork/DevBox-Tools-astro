@@ -1,7 +1,238 @@
+
+
 /**
  * 共用 CSS 樣式
- * 包含 Checkbox、Slider、Modal 等元件樣式
+ * 包含 Table, Layout, Checkbox、Slider、Modal 等元件樣式
  */
+
+/* ========================================
+   Table Styles (from table.css)
+   ======================================== */
+@layer components {
+  /* 表格容器：負責滾動 */
+  .data-table-container {
+    @apply max-h-[600px] overflow-y-auto;
+    
+    &::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    &::-webkit-scrollbar-thumb {
+      background-color: var(--border);
+      border-radius: 9999px;
+    }
+    &::-webkit-scrollbar-thumb:hover {
+      background-color: var(--muted-foreground);
+    }
+  }
+  
+  /* 表格本體 */
+  .data-table {
+    @apply w-full text-sm text-left border-collapse;
+  }
+  
+  /* 表頭 */
+  .data-table-header {
+    @apply bg-muted/50 text-muted-foreground font-medium sticky top-0 z-10 backdrop-blur-md;
+  }
+  
+  .data-table-header-cell {
+    @apply px-4 py-3 font-medium whitespace-nowrap;
+  }
+  
+  /* 表格內容 */
+  .data-table-body {
+    @apply divide-y divide-border;
+  }
+  
+  .data-table-row {
+    @apply hover:bg-muted/30 transition-colors;
+  }
+  
+  .data-table-cell {
+    @apply px-4 py-3 align-middle;
+  }
+  
+  /* 常用元件：縮圖 */
+  .data-table-thumbnail {
+    @apply w-12 h-12 rounded-lg overflow-hidden bg-secondary/50 shrink-0 cursor-pointer ring-1 ring-border transition-all;
+  }
+  
+  /* Implement group-hover logic manually */
+  .data-table-row:hover .data-table-thumbnail {
+      @apply ring-primary/50;
+  }
+  
+  /* 常用元件：轉換結果Badge */
+  .badge-success {
+    @apply text-[10px] bg-chart-2/10 text-chart-2 px-1 rounded ml-1;
+  }
+}
+
+/* ========================================
+   Layout Styles (from layout.css)
+   ======================================== */
+/* ========================================
+   Layout Styles (from layout.css)
+   ======================================== */
+/* Removed @layer components wrapper to ensure styles are loaded globally */
+
+/* Action Bar (操作工具列) */
+.tool-action-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem; /* gap-4 */
+  border-radius: 0.75rem; /* rounded-xl */
+  border: 1px solid var(--border);
+  background-color: var(--card); /* bg-card */
+  padding: 1rem; /* p-4 */
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); /* shadow-sm */
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .tool-action-bar {
+    flex-direction: row;
+  }
+}
+
+/* 左側區域 */
+.tool-action-left {
+   display: flex;
+   align-items: center;
+   gap: 0.75rem; /* gap-3 */
+   width: 100%;
+   overflow-x: auto;
+   padding-bottom: 0.25rem;
+}
+
+@media (min-width: 640px) {
+  .tool-action-left {
+    width: auto;
+    padding-bottom: 0;
+  }
+}
+
+/* 右側區域 */
+.tool-action-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem; /* gap-2 */
+  width: 100%;
+  justify-content: flex-end;
+}
+
+@media (min-width: 640px) {
+  .tool-action-right {
+    width: auto;
+  }
+}
+
+.tool-action-separator {
+  height: 1.5rem; /* h-6 */
+  width: 1px;
+  background-color: var(--border);
+  margin-left: 0.25rem;
+  margin-right: 0.25rem;
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .tool-action-separator {
+    display: block;
+  }
+}
+
+/* 統計資訊文字 */
+.tool-stats-text {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+/* Empty State / Dropzone (拖曳區域) */
+.tool-dropzone {
+  border: 2px dashed var(--border);
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+}
+
+.tool-dropzone-active {
+  border-color: var(--primary);
+  background-color: color-mix(in srgb, var(--primary) 5%, transparent);
+}
+
+.tool-dropzone-inactive {
+  border-color: var(--border);
+  background-color: var(--card);
+}
+
+.tool-dropzone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-top: 2.5rem; /* py-10 */
+  padding-bottom: 2.5rem;
+  text-align: center;
+  width: 100%;
+  height: 100%;
+}
+
+/* space-y-4 alternative */
+.tool-dropzone-content > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 1rem;
+}
+
+.tool-dropzone-icon-wrapper {
+  padding: 1rem;
+  background-color: color-mix(in srgb, var(--primary) 10%, transparent);
+  border-radius: 9999px;
+  color: var(--primary);
+  margin-bottom: 0.5rem;
+  display: inline-flex;
+}
+
+.tool-dropzone-title {
+  font-size: 1.25rem; /* text-xl */
+  line-height: 1.75rem;
+  font-weight: 600; /* font-semibold */
+}
+
+.tool-dropzone-description {
+   font-size: 0.875rem; /* text-sm */
+   color: var(--muted-foreground);
+   max-width: 24rem; /* max-w-sm */
+   margin-left: auto;
+   margin-right: auto;
+}
+
+.tool-section-title {
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-bottom: 0.5rem;
+}
+
+/* ========================================
+   Existing Components Styles
+   ======================================== */
 
 /* ========================================
    Custom Checkbox

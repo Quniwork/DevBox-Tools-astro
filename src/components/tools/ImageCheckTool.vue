@@ -455,21 +455,21 @@ const closePreview = () => {
     <!-- Initial Large Drop Zone -->
     <Card 
         v-if="scannedFiles.length === 0"
-        class="border-2 border-dashed transition-colors duration-200"
-        :class="dragActive ? 'border-primary bg-primary/5' : 'border-border bg-card'"
+        class="tool-dropzone"
+        :class="dragActive ? 'tool-dropzone-active' : 'tool-dropzone-inactive'"
         @dragenter="handleDragOver"
         @dragover="handleDragOver"
         @dragleave="handleDragLeave"
         @drop="handleDrop"
     >
-        <CardContent class="flex flex-col items-center justify-center py-10 text-center space-y-4">
-            <div class="p-4 bg-primary/10 rounded-full">
-                <FolderSearch v-if="!isScanning" class="w-10 h-10 text-primary" />
-                <Loader2 v-else class="w-10 h-10 text-primary animate-spin" />
+        <div class="tool-dropzone-content">
+            <div class="tool-dropzone-icon-wrapper">
+                <FolderSearch v-if="!isScanning" class="w-10 h-10" />
+                <Loader2 v-else class="w-10 h-10 animate-spin" />
             </div>
             <div class="space-y-2">
-                <h3 class="text-xl font-semibold">{{ isScanning ? '掃描中...' : '拖曳資料夾至此 或 點擊選擇' }}</h3>
-                <p class="text-sm text-muted-foreground max-w-sm mx-auto">
+                <h3 class="tool-dropzone-title">{{ isScanning ? '掃描中...' : '拖曳資料夾至此 或 點擊選擇' }}</h3>
+                <p class="tool-dropzone-description">
                     系統會自動忽略 <code class="bg-muted px-1 rounded">not-use</code> 資料夾的檢查，但下載時會保留完整結構。
                 </p>
             </div>
@@ -490,7 +490,7 @@ const closePreview = () => {
                     />
                 </div>
             </div>
-        </CardContent>
+        </div>
     </Card>
 
 
@@ -498,9 +498,9 @@ const closePreview = () => {
     <div v-else class="space-y-4">
 
         <!-- Action Bar -->
-        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl border border-border bg-card p-4">
+        <div class="tool-action-bar">
             
-            <div class="flex items-center gap-4 w-full sm:w-auto">
+            <div class="tool-action-left">
                 <!-- Left: Upload Button (Drag Zone) -->
                 <div 
                     class="relative group w-full sm:w-auto"
@@ -557,7 +557,7 @@ const closePreview = () => {
             </div>
             
             <!-- Right: Actions -->
-            <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <div class="tool-action-right">
                 <ToolButton 
                     type="clear" 
                     @click="clearAll" 
@@ -618,22 +618,22 @@ const closePreview = () => {
         <!-- Result List (Visible only if there are overLimit items) -->
         <Card v-if="overLimitCount > 0" class="bg-card">
             <CardContent class="p-0">
-                <table class="w-full text-sm text-left">
-                    <thead class="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm text-muted-foreground font-medium border-b border-border">
+                <table class="data-table">
+                    <thead class="data-table-header">
                         <tr>
-                            <th class="px-4 py-3 text-left w-[50px]">縮圖</th>
-                            <th class="px-4 py-3 text-left">檔案名稱</th>
-                            <th class="px-4 py-3 text-right hidden sm:table-cell">原始大小</th>
-                            <th class="px-4 py-3 text-right">優化後大小</th>
-                            <th class="px-4 py-3 text-right">操作</th>
+                            <th class="data-table-header-cell text-left w-[50px]">縮圖</th>
+                            <th class="data-table-header-cell text-left">檔案名稱</th>
+                            <th class="data-table-header-cell text-right hidden sm:table-cell">原始大小</th>
+                            <th class="data-table-header-cell text-right">優化後大小</th>
+                            <th class="data-table-header-cell text-right">操作</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-border">
-                        <tr v-for="file in overLimitFiles" :key="file.path" class="hover:bg-muted/50 transition-colors">
+                    <tbody class="data-table-body">
+                        <tr v-for="file in overLimitFiles" :key="file.path" class="data-table-row">
                             <!-- Thumbnail -->
-                            <td class="px-4 py-3">
+                            <td class="data-table-cell">
                                 <div 
-                                    class="w-10 h-10 rounded-lg overflow-hidden bg-secondary flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
+                                    class="data-table-thumbnail w-10 h-10 flex items-center justify-center"
                                     @click="openPreview(file)"
                                 >
                                     <img 
@@ -647,7 +647,7 @@ const closePreview = () => {
                             </td>
                             
                             <!-- File Name & Path -->
-                            <td class="px-4 py-3">
+                            <td class="data-table-cell">
                                 <div class="flex items-center gap-3 min-w-0">
                                     <div class="min-w-0 flex flex-col">
                                         <span class="font-medium text-foreground truncate max-w-[150px] sm:max-w-xs" :title="file.name">{{ file.name }}</span>
@@ -659,12 +659,12 @@ const closePreview = () => {
                             </td>
                             
                             <!-- Original Size -->
-                            <td class="px-4 py-3 text-right font-mono text-muted-foreground hidden sm:table-cell text-xs">
+                            <td class="data-table-cell text-right font-mono text-muted-foreground hidden sm:table-cell text-xs">
                                 {{ formatSize(file.originalSize) }}
                             </td>
                             
                             <!-- Optimized Size / Status -->
-                            <td class="px-4 py-3 text-right">
+                            <td class="data-table-cell text-right">
                                 <div v-if="file.status === 'processing'" class="flex items-center justify-end gap-1.5 text-primary">
                                     <Loader2 class="w-3.5 h-3.5 animate-spin" />
                                     <span class="text-xs font-medium">處理中</span>
@@ -678,7 +678,7 @@ const closePreview = () => {
                                     </span>
                                     <span 
                                        v-if="file.optimizedSize && file.optimizedSize < file.originalSize"
-                                       class="text-[10px] bg-chart-2/10 text-chart-2 px-1 rounded"
+                                       class="badge-success"
                                     >
                                        -{{ Math.abs(Math.round(((file.originalSize - file.optimizedSize) / file.originalSize) * 100)) }}%
                                     </span>
@@ -691,7 +691,7 @@ const closePreview = () => {
                             </td>
                             
                             <!-- Actions -->
-                            <td class="px-4 py-3 text-right">
+                            <td class="data-table-cell text-right">
                                 <div class="flex items-center justify-end gap-1">
                                     <Button 
                                         variant="ghost" 

@@ -556,8 +556,8 @@ const closePreview = () => {
     <!-- 3. 上傳區 (Action Bar) -->
     <div class="flex flex-col gap-4">
         <!-- 檔案列表存在時顯示操作列 -->
-        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl border border-border bg-card p-4 shadow-sm" v-if="items.length > 0">
-          <div class="flex items-center gap-3 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+        <div class="tool-action-bar" v-if="items.length > 0">
+          <div class="tool-action-left">
              <!-- Single Upload Button (Folder & Files) -->
             <div class="relative group w-full sm:w-auto"
                 @dragover="handleDragOver"
@@ -583,7 +583,7 @@ const closePreview = () => {
                 </Button>
             </div>
             
-            <div class="h-6 w-px bg-border mx-1"></div>
+            <div class="tool-action-separator"></div>
             
             <!-- Stats -->
             <div class="flex items-center gap-3 text-sm whitespace-nowrap">
@@ -605,7 +605,7 @@ const closePreview = () => {
             </div>
           </div>
           
-          <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+          <div class="tool-action-right">
             <ToolButton 
               v-if="items.length > 0" 
               type="clear" 
@@ -624,21 +624,21 @@ const closePreview = () => {
         <!-- Initial Large Drop Zone -->
         <Card 
             v-if="items.length === 0"
-            class="border-2 border-dashed transition-colors duration-200"
-            :class="dragActive ? 'border-primary bg-primary/5' : 'border-border bg-card'"
+            class="tool-dropzone"
+            :class="dragActive ? 'tool-dropzone-active' : 'tool-dropzone-inactive'"
             @dragenter="handleDragOver"
             @dragover="handleDragOver"
             @dragleave="handleDragLeave"
             @drop="handleDropImage"
         >
-            <CardContent class="flex flex-col items-center justify-center py-10 text-center space-y-4">
-                <div class="p-4 bg-primary/10 rounded-full">
+            <div class="tool-dropzone-content">
+                <div class="tool-dropzone-icon-wrapper">
                     <FolderSearch v-if="!isProcessing" class="w-10 h-10 text-primary" />
                     <Loader2 v-else class="w-10 h-10 text-primary animate-spin" />
                 </div>
                 <div class="space-y-2">
-                    <h3 class="text-xl font-semibold">批量圖片轉換</h3>
-                    <p class="text-sm text-muted-foreground max-w-sm mx-auto">
+                    <h3 class="tool-dropzone-title">批量圖片轉換</h3>
+                    <p class="tool-dropzone-description">
                         拖曳資料夾至此 或 點擊選擇<br/>
                         <span class="text-xs opacity-70">支援 JPG, PNG, WebP, GIF</span>
                     </p>
@@ -659,29 +659,29 @@ const closePreview = () => {
                         />
                     </div>
                 </div>
-            </CardContent>
+            </div>
         </Card>
     </div>
 
     <!-- 4. 檔案列表 (Table Style) -->
     <Card v-if="items.length > 0" class="bg-card overflow-hidden shadow-sm border-border/50">
         <div class="max-h-[600px] overflow-y-auto custom-scrollbar">
-            <table class="w-full text-sm text-left border-collapse">
-                <thead class="bg-muted/50 text-muted-foreground font-medium sticky top-0 z-10 backdrop-blur-md">
+            <table class="data-table">
+                <thead class="data-table-header">
                     <tr>
-                        <th class="px-4 py-3 w-[40%]">檔案名稱</th>
-                        <th class="px-4 py-3 text-right w-[15%] hidden sm:table-cell">原始</th>
-                        <th class="px-4 py-3 text-right w-[25%]">優化後</th>
-                        <th class="px-4 py-3 text-right w-[20%]">操作</th>
+                        <th class="data-table-header-cell w-[40%]">檔案名稱</th>
+                        <th class="data-table-header-cell text-right w-[15%] hidden sm:table-cell">原始</th>
+                        <th class="data-table-header-cell text-right w-[25%]">優化後</th>
+                        <th class="data-table-header-cell text-right w-[20%]">操作</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-border">
-                    <tr v-for="item in items" :key="item.id" class="group hover:bg-muted/30 transition-colors">
-                        <td class="px-4 py-3">
+                <tbody class="data-table-body">
+                    <tr v-for="item in items" :key="item.id" class="data-table-row">
+                        <td class="data-table-cell">
                             <div class="flex items-center gap-3">
                                 <!-- Thumbnail -->
                                 <div 
-                                    class="w-12 h-12 rounded-lg overflow-hidden bg-secondary/50 shrink-0 cursor-pointer ring-1 ring-border group-hover:ring-primary/50 transition-all"
+                                    class="data-table-thumbnail"
                                     @click="openPreview(item)"
                                 >
                                     <img 
@@ -701,11 +701,11 @@ const closePreview = () => {
                             </div>
                         </td>
                         
-                        <td class="px-4 py-3 text-right font-mono text-muted-foreground hidden sm:table-cell text-xs">
+                        <td class="data-table-cell text-right font-mono text-muted-foreground hidden sm:table-cell text-xs">
                             {{ formatSize(item.originalSize) }}
                         </td>
                         
-                        <td class="px-4 py-3 text-right">
+                        <td class="data-table-cell text-right">
                              <div v-if="item.status === 'converting'" class="flex items-center justify-end gap-1.5 text-primary">
                                  <RefreshCw class="w-3.5 h-3.5 animate-spin" />
                                  <span class="text-xs font-medium">轉換中</span>
@@ -719,7 +719,7 @@ const closePreview = () => {
                                  </span>
                                  <span 
                                     v-if="item.convertedSize < item.originalSize"
-                                    class="text-[10px] bg-chart-2/10 text-chart-2 px-1 rounded"
+                                    class="badge-success"
                                  >
                                     -{{ Math.abs(Math.round(((item.originalSize - item.convertedSize) / item.originalSize) * 100)) }}%
                                  </span>
@@ -727,7 +727,7 @@ const closePreview = () => {
                              <div v-else class="text-muted-foreground text-xs opacity-50">-</div>
                         </td>
                         
-                        <td class="px-4 py-3 text-right">
+                        <td class="data-table-cell text-right">
                             <div class="flex items-center justify-end gap-1">
                                 <Button 
                                     variant="ghost" 

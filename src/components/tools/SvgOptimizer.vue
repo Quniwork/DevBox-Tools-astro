@@ -540,8 +540,8 @@ const batchTotalSavings = computed(() => {
     <div v-show="activeTab === 'batch'" class="space-y-4">
       
        <!-- Standard Action Bar (Show when files exist) -->
-      <div v-if="batchItems.length > 0" class="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl border border-border bg-card p-4 shadow-sm">
-        <div class="flex items-center gap-3 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+      <div v-if="batchItems.length > 0" class="tool-action-bar">
+        <div class="tool-action-left">
            <!-- Single Upload Button Group -->
            <div 
             class="relative group w-full sm:w-auto"
@@ -567,7 +567,7 @@ const batchTotalSavings = computed(() => {
             </Button>
            </div>
            
-           <div class="h-6 w-px bg-border mx-1 hidden sm:block"></div>
+           <div class="tool-action-separator"></div>
 
            <!-- Stats -->
            <div class="flex items-center gap-3 text-sm whitespace-nowrap">
@@ -588,7 +588,7 @@ const batchTotalSavings = computed(() => {
            </div>
         </div>
 
-        <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+        <div class="tool-action-right">
           <ToolButton 
             type="clear" 
             @click="clearBatchItems" 
@@ -611,21 +611,21 @@ const batchTotalSavings = computed(() => {
       <!-- Standard Large Drop Zone (Show when no files) -->
        <Card 
             v-if="batchItems.length === 0"
-            class="border-2 border-dashed transition-colors duration-200"
-            :class="isDraggingBatch ? 'border-primary bg-primary/5' : 'border-border bg-card'"
+            class="tool-dropzone"
+            :class="isDraggingBatch ? 'tool-dropzone-active' : 'tool-dropzone-inactive'"
             @dragenter="handleDragOverBatch"
             @dragover="handleDragOverBatch"
             @dragleave="handleDragLeaveBatch"
             @drop="handleDropBatch"
         >
-            <CardContent class="flex flex-col items-center justify-center py-10 text-center space-y-4">
-                <div class="p-4 bg-primary/10 rounded-full">
-                    <Upload v-if="!isDraggingBatch" class="w-10 h-10 text-primary" />
-                    <FolderSearch v-else class="w-10 h-10 text-primary" />
+            <div class="tool-dropzone-content">
+                <div class="tool-dropzone-icon-wrapper">
+                    <Upload v-if="!isDraggingBatch" class="w-10 h-10" />
+                    <FolderSearch v-else class="w-10 h-10" />
                 </div>
                 <div class="space-y-2">
-                    <h3 class="text-xl font-semibold">批量 SVG 壓縮</h3>
-                    <p class="text-sm text-muted-foreground max-w-sm mx-auto">
+                    <h3 class="tool-dropzone-title">批量 SVG 壓縮</h3>
+                    <p class="tool-dropzone-description">
                         拖曳 SVG 檔案至此 或 點擊選擇<br/>
                         <span class="text-xs opacity-70">自動移除冗餘代碼與空白</span>
                     </p>
@@ -645,28 +645,28 @@ const batchTotalSavings = computed(() => {
                         />
                     </div>
                 </div>
-            </CardContent>
+            </div>
         </Card>
 
       <!-- Standard Table List -->
        <Card v-if="batchItems.length > 0" class="bg-card overflow-hidden shadow-sm border-border/50">
-        <div class="max-h-[600px] overflow-y-auto custom-scrollbar">
-            <table class="w-full text-sm text-left border-collapse">
-                <thead class="bg-muted/50 text-muted-foreground font-medium sticky top-0 z-10 backdrop-blur-md">
+        <div class="data-table-container">
+            <table class="data-table">
+                <thead class="data-table-header">
                     <tr>
-                        <th class="px-4 py-3 w-[40%]">檔案名稱</th>
-                        <th class="px-4 py-3 text-right w-[15%] hidden sm:table-cell">原始</th>
-                        <th class="px-4 py-3 text-right w-[25%]">優化後</th>
-                        <th class="px-4 py-3 text-right w-[20%]">操作</th>
+                        <th class="data-table-header-cell w-[40%]">檔案名稱</th>
+                        <th class="data-table-header-cell text-right w-[15%] hidden sm:table-cell">原始</th>
+                        <th class="data-table-header-cell text-right w-[25%]">優化後</th>
+                        <th class="data-table-header-cell text-right w-[20%]">操作</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-border">
-                    <tr v-for="item in batchItems" :key="item.id" class="group hover:bg-muted/30 transition-colors">
-                        <td class="px-4 py-3">
+                <tbody class="data-table-body">
+                    <tr v-for="item in batchItems" :key="item.id" class="data-table-row">
+                        <td class="data-table-cell">
                             <div class="flex items-center gap-3">
                                 <!-- Thumbnail -->
                                 <div 
-                                    class="w-12 h-12 rounded-lg overflow-hidden bg-secondary/50 shrink-0 cursor-pointer ring-1 ring-border group-hover:ring-primary/50 transition-all flex items-center justify-center p-1"
+                                    class="data-table-thumbnail flex items-center justify-center p-1"
                                     @click="openBatchPreview(item)"
                                 >
                                     <img 
@@ -681,11 +681,11 @@ const batchTotalSavings = computed(() => {
                             </div>
                         </td>
                         
-                        <td class="px-4 py-3 text-right font-mono text-muted-foreground hidden sm:table-cell text-xs">
+                        <td class="data-table-cell text-right font-mono text-muted-foreground hidden sm:table-cell text-xs">
                             {{ formatSize(item.originalSize) }}
                         </td>
                         
-                        <td class="px-4 py-3 text-right">
+                        <td class="data-table-cell text-right">
                              <div class="flex flex-col items-end gap-0.5">
                                  <span 
                                     class="font-mono font-bold text-sm" 
@@ -695,14 +695,14 @@ const batchTotalSavings = computed(() => {
                                  </span>
                                  <span 
                                     v-if="item.savings !== 0"
-                                    class="text-[10px] bg-chart-2/10 text-chart-2 px-1 rounded"
+                                    class="badge-success"
                                  >
                                     -{{ Math.abs(item.savings) }}%
                                  </span>
                              </div>
                         </td>
                         
-                        <td class="px-4 py-3 text-right">
+                        <td class="data-table-cell text-right">
                             <div class="flex items-center justify-end gap-1">
                                 <Button 
                                     variant="ghost" 
