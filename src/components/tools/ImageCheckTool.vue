@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { AlertCircle, CheckCircle2, FolderSearch, Loader2, RefreshCw, Upload, Download, Image, X, Key, Settings } from 'lucide-vue-next';
+import { AlertCircle, CheckCircle2, FolderSearch, Loader2, RefreshCw, Upload, Download, Image, X } from 'lucide-vue-next';
 import Button from '@/components/ui/Button.vue';
 import ToolButton from '@/components/ui/ToolButton.vue';
 import JSZip from 'jszip';
@@ -18,17 +18,16 @@ interface ScannedFile {
   type: string;
   isOverLimit: boolean;
   isExcluded: boolean;
+  previewUrl: string; // Preview URL for thumbnail
   
   // Optimization State
   status: 'pending' | 'processing' | 'done' | 'error';
   optimizedBlob?: Blob;
   optimizedSize?: number;
-  usedTinify?: boolean; // 標記是否使用了 Tinify
 }
 
 const LIMIT_SIZE_KB = 600;
 const LIMIT_SIZE_BYTES = LIMIT_SIZE_KB * 1024;
-const TINIFY_STORAGE_KEY = 'tinify_api_key_enc'; // 加密儲存的 key（這是 localStorage 的鍵名，不是 API Key）
 
 // ========================================
 // State
@@ -37,16 +36,6 @@ const isScanning = ref(false);
 const scannedFiles = ref<ScannedFile[]>([]);
 const dragActive = ref(false);
 const isCompressing = ref(false); // Global compressing state (for download packaging)
-
-// ========================================
-// Tinify API 相關狀態
-// ========================================
-const tinifyApiKey = ref<string>('');
-const tinifyEnabled = ref(false);
-const tinifyUsage = ref({ compressionCount: 0, limit: 500 });
-const showTinifySettings = ref(false);
-const tinifyApiKeyInput = ref<string>('');
-const isFetchingUsage = ref(false);
 
 // Stats
 // Active files = Non-excluded files
@@ -85,138 +74,6 @@ const overLimitFiles = computed(() =>
 );
 
 // ========================================
-// Tinify API 管理函式
-// ========================================
-
-// 載入 Tinify API Key（從 localStorage）
-const loadTinifyApiKey = () => {
-    if (typeof window === 'undefined') return;
-    const encrypted = localStorage.getItem(TINIFY_STORAGE_KEY);
-    if (encrypted) {
-        try {
-            // 使用 Base64 解碼（避免明文儲存）
-            tinifyApiKey.value = atob(encrypted);
-            tinifyEnabled.value = true;
-        } catch (e) {
-            // 解碼失敗，清除無效資料
-            localStorage.removeItem(TINIFY_STORAGE_KEY);
-        }
-    }
-};
-
-// 保存 Tinify API Key
-const saveTinifyApiKey = async () => {
-    const key = tinifyApiKeyInput.value.trim();
-    if (!key) {
-        alert('請輸入有效的 API Key');
-        return;
-    }
-    
-    // 測試 API Key 是否有效（透過後端代理）
-    isFetchingUsage.value = true;
-    try {
-        const formData = new FormData();
-        formData.append('apiKey', key);
-        formData.append('action', 'validate');
-        
-        const response = await fetch('/api/tinify', {
-            method: 'POST',
-            body: formData
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            // API Key 有效
-            localStorage.setItem(TINIFY_STORAGE_KEY, btoa(key));
-            tinifyApiKey.value = key;
-            tinifyEnabled.value = true;
-            tinifyUsage.value.compressionCount = result.compressionCount || 0;
-            tinifyApiKeyInput.value = '';
-            showTinifySettings.value = false;
-            alert('API Key 設定成功！');
-        } else {
-            throw new Error(result.error || '無法驗證 API Key');
-        }
-    } catch (error) {
-        alert('API Key 驗證失敗，請檢查是否正確\n錯誤：' + (error instanceof Error ? error.message : '未知錯誤'));
-    } finally {
-        isFetchingUsage.value = false;
-    }
-};
-
-// 移除 Tinify API Key
-const removeTinifyApiKey = () => {
-    if (confirm('確定要移除 Tinify API Key 嗎？')) {
-        localStorage.removeItem(TINIFY_STORAGE_KEY);
-        tinifyApiKey.value = '';
-        tinifyEnabled.value = false;
-        tinifyUsage.value = { compressionCount: 0, limit: 500 };
-    }
-};
-
-// 獲取 Tinify API 用量
-const fetchTinifyUsage = async () => {
-    if (!tinifyEnabled.value || !tinifyApiKey.value) return;
-    
-    try {
-        const formData = new FormData();
-        formData.append('apiKey', tinifyApiKey.value);
-        formData.append('action', 'validate');
-        
-        const response = await fetch('/api/tinify', {
-            method: 'POST',
-            body: formData
-        });
-        
-        const result = await response.json();
-        if (result.success && result.compressionCount !== undefined) {
-            tinifyUsage.value.compressionCount = result.compressionCount;
-        }
-    } catch (error) {
-        // 靜默失敗，不影響主流程
-    }
-};
-
-// 使用 Tinify 壓縮圖片
-const compressWithTinify = async (file: File): Promise<Blob> => {
-    if (!tinifyEnabled.value || !tinifyApiKey.value) {
-        throw new Error('Tinify 未啟用');
-    }
-    
-    const formData = new FormData();
-    formData.append('apiKey', tinifyApiKey.value);
-    formData.append('action', 'compress');
-    formData.append('image', file);
-    
-    const response = await fetch('/api/tinify', {
-        method: 'POST',
-        body: formData
-    });
-    
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || `壓縮失敗: ${response.status}`);
-    }
-    
-    // 更新用量
-    const count = response.headers.get('X-Compression-Count');
-    if (count) {
-        tinifyUsage.value.compressionCount = parseInt(count);
-    }
-    
-    return await response.blob();
-};
-
-// 取得遮罩後的 API Key（用於顯示）
-const getMaskedApiKey = computed(() => {
-    if (!tinifyApiKey.value) return '';
-    const key = tinifyApiKey.value;
-    if (key.length <= 8) return '***';
-    return key.substring(0, 4) + '***' + key.substring(key.length - 4);
-});
-
-// ========================================
 // Methods
 // ========================================
 
@@ -226,6 +83,30 @@ const formatSize = (bytes: number) => {
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+// Download single file
+const downloadFile = (file: ScannedFile) => {
+    const blob = file.optimizedBlob || file.file;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.name;
+    a.click();
+    URL.revokeObjectURL(url);
+};
+
+// Remove single file
+const removeFile = (file: ScannedFile) => {
+    // Revoke preview URL
+    if (file.previewUrl) {
+        URL.revokeObjectURL(file.previewUrl);
+    }
+    // Remove from array
+    const index = scannedFiles.value.findIndex(f => f.path === file.path);
+    if (index > -1) {
+        scannedFiles.value.splice(index, 1);
+    }
 };
 
 // Handle Input Change
@@ -344,6 +225,7 @@ const processFinalList = async (items: { file: File, path: string }[]) => {
             type: file.type,
             isOverLimit,
             isExcluded,
+            previewUrl: URL.createObjectURL(file), // Generate preview URL
             status: isOverLimit && !isExcluded ? 'pending' : 'done', // Only pending if needs compression
         };
         
@@ -434,59 +316,39 @@ const convertToOptimizedBlob = async (file: File): Promise<Blob> => {
     const MAX_SIZE = LIMIT_SIZE_BYTES;
     const type = file.type; // 'image/png' or 'image/jpeg'
     
-    // ⭐ 特殊邏輯：PNG 且超過 600KB，嘗試使用 Tinify
-    if (type === 'image/png' && file.size > MAX_SIZE && tinifyEnabled.value && tinifyApiKey.value) {
-        try {
-            const tinifyBlob = await compressWithTinify(file);
-            // 檢查壓縮後是否符合大小要求
-            if (tinifyBlob.size <= MAX_SIZE) {
-                return tinifyBlob;
-            }
-            // 如果 Tinify 壓縮後仍然過大，繼續用瀏覽器方法
-        } catch (error) {
-            // Tinify 失敗，fallback 到瀏覽器壓縮
-            console.warn('Tinify 壓縮失敗，使用瀏覽器壓縮:', error);
-        }
-    }
-    
     return new Promise((resolve, reject) => {
         const img = new Image();
         const url = URL.createObjectURL(file);
         
         img.onload = async () => {
-             // 1. Try Original Type (High Quality)
-             // Start at 1.0. For PNG this is lossless re-encoding.
-             let quality = 1.0; 
+             // 1. 初始嘗試：使用高品質
+             let quality = 0.9; 
              let blob = await getCanvasBlob(img, quality, 1, type);
              
-             // 2. Optimization Loop (Only works for JPG/WebP if type was changed, but here we strict type)
-             if (type === 'image/jpeg' || type === 'image/webp') {
-                 let attempts = 0;
-                 while (blob && blob.size > MAX_SIZE && quality > 0.1 && attempts < 50) {
-                     quality -= 0.02;
-                     blob = await getCanvasBlob(img, quality, 1, type);
-                     attempts++;
-                 }
-                 
-                 // 3. Scaling Loop (Only for JPG)
-                 // User forbids scaling for PNG.
-                 if (blob && blob.size > MAX_SIZE) {
-                     quality = 0.9;
-                     let scale = 0.95;
-                     let scaledBlob = blob;
-                     attempts = 0;
-                      while (scaledBlob && scaledBlob.size > MAX_SIZE && scale > 0.1 && attempts < 50) {
-                         scaledBlob = await getCanvasBlob(img, quality, scale, type); 
-                         scale -= 0.05;
-                         attempts++;
-                     }
-                     blob = scaledBlob;
-                 }
+             // 2. 品質優化循環（適用於 JPG/WebP/PNG）
+             let attempts = 0;
+             while (blob && blob.size > MAX_SIZE && quality > 0.1 && attempts < 50) {
+                 quality -= 0.05;
+                 blob = await getCanvasBlob(img, quality, 1, type);
+                 attempts++;
              }
              
-             // Final Check
+             // 3. 縮放循環（如果品質降低仍無法達標）
              if (blob && blob.size > MAX_SIZE) {
-                 // For PNG, if re-encoding didn't help (and we can't scale/compress), we fail.
+                 quality = 0.8;
+                 let scale = 0.95;
+                 let scaledBlob = blob;
+                 attempts = 0;
+                  while (scaledBlob && scaledBlob.size > MAX_SIZE && scale > 0.3 && attempts < 50) {
+                     scaledBlob = await getCanvasBlob(img, quality, scale, type); 
+                     scale -= 0.05;
+                     attempts++;
+                 }
+                 blob = scaledBlob;
+             }
+             
+             // 最終檢查
+             if (blob && blob.size > MAX_SIZE) {
                  reject(new Error('FILE_TOO_LARGE'));
                  return;
              }
@@ -508,7 +370,7 @@ const convertToOptimizedBlob = async (file: File): Promise<Blob> => {
     });
 };
 
-const getCanvasBlob = (img: HTMLImageElement, quality: number, scale: number = 1, type: string = 'image/jpeg'): Promise<Blob | null> => {
+const getCanvasBlob = (img: HTMLImageElement, quality: number, scale: number = 1, type: string): Promise<Blob | null> => {
     return new Promise((resolve) => {
         const canvas = document.createElement('canvas');
         canvas.width = Math.floor(img.width * scale);
@@ -519,12 +381,10 @@ const getCanvasBlob = (img: HTMLImageElement, quality: number, scale: number = 1
             return;
         }
         
-        // Only fill white if JPG (which doesn't support transparency)
+        // 僅 JPG 需要白色背景（不支援透明）
         if (type === 'image/jpeg') {
             ctx.fillStyle = '#FFFFFF';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-        } else {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
         
         ctx.imageSmoothingEnabled = true;
@@ -569,10 +429,6 @@ const isMounted = ref(false);
 
 onMounted(() => {
     isMounted.value = true;
-    loadTinifyApiKey();
-    if (tinifyEnabled.value) {
-        fetchTinifyUsage();
-    }
 });
 
 const openPreview = (item: ScannedFile) => {
@@ -594,84 +450,7 @@ const closePreview = () => {
 <template>
   <div class="space-y-6">
     
-    <!-- Tinify API 設定區 -->
-    <Card class="border-amber-200 bg-amber-50/50">
-      <CardContent class="p-4">
-        <div class="flex items-center justify-between mb-3">
-          <div class="flex items-center gap-2">
-            <Key class="h-4 w-4 text-amber-600" />
-            <span class="text-sm font-medium text-amber-900">Tinify API 設定</span>
-            <span class="text-xs text-amber-600/70">(僅壓縮超過 600KB 的 PNG)</span>
-          </div>
-          <Button 
-            variant="ghost" 
-            size="icon"
-            class="h-8 w-8 text-amber-600 hover:text-amber-700"
-            @click="showTinifySettings = !showTinifySettings"
-          >
-            <Settings class="h-4 w-4" />
-          </Button>
-        </div>
 
-        <!-- API 狀態顯示 -->
-        <div v-if="!showTinifySettings" class="flex items-center gap-4 text-xs">
-          <template v-if="tinifyEnabled">
-            <div class="flex items-center gap-1 text-chart-2">
-              <CheckCircle2 class="h-3 w-3" />
-              <span>API 已啟用</span>
-            </div>
-            <div class="text-amber-700">
-              金鑰：<code class="font-mono bg-amber-100 px-1 rounded">{{ getMaskedApiKey }}</code>
-            </div>
-            <div class="text-amber-700">
-              本月用量：
-              <span class="font-mono font-medium">{{ tinifyUsage.compressionCount }}</span> / 
-              <span class="font-mono">{{ tinifyUsage.limit }}</span>
-            </div>
-            <Button 
-              variant="ghost" 
-              size="sm"
-              class="h-6 px-2 text-xs text-amber-600 hover:text-destructive"
-              @click="removeTinifyApiKey"
-            >
-              移除
-            </Button>
-          </template>
-          <template v-else>
-            <div class="flex items-center gap-1 text-muted-foreground">
-              <AlertCircle class="h-3 w-3" />
-              <span>API 未設定（將使用瀏覽器壓縮）</span>
-            </div>
-          </template>
-        </div>
-
-        <!-- API Key 輸入區 -->
-        <div v-if="showTinifySettings" class="space-y-3 mt-3">
-          <div class="flex gap-2">
-            <input 
-              type="text" 
-              v-model="tinifyApiKeyInput"
-              placeholder="請輸入 Tinify API Key"
-              class="flex-1 px-3 py-2 border border-amber-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-              @keyup.enter="saveTinifyApiKey"
-            />
-            <Button 
-              variant="default"
-              class="bg-amber-600 hover:bg-amber-700"
-              :disabled="isFetchingUsage"
-              @click="saveTinifyApiKey"
-            >
-              <Loader2 v-if="isFetchingUsage" class="h-4 w-4 animate-spin mr-2" />
-              {{ isFetchingUsage ? '驗證中...' : '保存' }}
-            </Button>
-          </div>
-          <p class="text-xs text-amber-700">
-            💡 API Key 將加密保存在本地，不會上傳到伺服器。
-            取得 API Key：<a href="https://tinypng.com/developers" target="_blank" class="underline">https://tinypng.com/developers</a>
-          </p>
-        </div>
-      </CardContent>
-    </Card>
 
     <!-- Initial Large Drop Zone -->
     <Card 
@@ -784,28 +563,22 @@ const closePreview = () => {
                     @click="clearAll" 
                 />
                 
-                <!-- New Button: Download Unoptimized Only -->
-                <Button 
+                <!-- Download Unoptimized Files Button -->
+                <ToolButton 
                     v-if="scannedFiles.some(f => f.status === 'error')"
-                    variant="secondary" 
-                    class="gap-2 text-amber-600 bg-amber-50 hover:bg-amber-100 border border-amber-200"
-                    title="下載無法壓縮的檔案以進行手動處理"
+                    type="download"
+                    label="下載未達標"
+                    variant="warning"
                     @click="downloadUnoptimized"
-                >
-                    <Download class="w-4 h-4" />
-                    下載未達標檔案
-                </Button>
+                />
 
-                <Button 
-                    variant="default" 
-                    class="gap-2"
-                    :disabled="isCompressing"
+                <!-- Download All Button -->
+                <ToolButton 
+                    type="download" 
+                    label="全部下載"
+                    :loading="isCompressing"
                     @click="fixAndDownload"
-                >
-                    <Loader2 v-if="isCompressing" class="w-4 h-4 animate-spin" />
-                    <Download v-else class="w-4 h-4" />
-                    {{ isCompressing ? '打包中...' : '全部下載' }}
-                </Button>
+                />
             </div>
         </div>
 
@@ -846,49 +619,111 @@ const closePreview = () => {
         <Card v-if="overLimitCount > 0" class="bg-card">
             <CardContent class="p-0">
                 <table class="w-full text-sm text-left">
-                    <thead class="bg-muted/50 text-muted-foreground font-medium border-b border-border">
+                    <thead class="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm text-muted-foreground font-medium border-b border-border">
                         <tr>
-                            <th class="px-4 py-3 w-[50%]">檔案名稱 (File)</th>
-                            <th class="px-4 py-3 text-right w-[25%]">原始大小</th>
-                            <th class="px-4 py-3 text-right w-[20%]">優化後大小</th>
-                            <th class="px-4 py-3 text-right w-[5%]">預覽</th>
+                            <th class="px-4 py-3 text-left w-[50px]">縮圖</th>
+                            <th class="px-4 py-3 text-left">檔案名稱</th>
+                            <th class="px-4 py-3 text-right hidden sm:table-cell">原始大小</th>
+                            <th class="px-4 py-3 text-right">優化後大小</th>
+                            <th class="px-4 py-3 text-right">操作</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-border">
                         <tr v-for="file in overLimitFiles" :key="file.path" class="hover:bg-muted/50 transition-colors">
+                            <!-- Thumbnail -->
                             <td class="px-4 py-3">
-                                <div class="font-medium text-foreground break-all">{{ file.name }}</div>
-                                <div class="text-xs text-muted-foreground mt-0.5 font-mono opacity-60">{{ file.folder }}</div>
+                                <div 
+                                    class="w-10 h-10 rounded-lg overflow-hidden bg-secondary flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
+                                    @click="openPreview(file)"
+                                >
+                                    <img 
+                                        v-if="file.previewUrl" 
+                                        :src="file.previewUrl" 
+                                        :alt="file.name"
+                                        class="w-full h-full object-cover"
+                                    />
+                                    <Image v-else class="w-5 h-5 text-muted-foreground" />
+                                </div>
                             </td>
-                            <td class="px-4 py-3 text-right font-mono text-muted-foreground">
+                            
+                            <!-- File Name & Path -->
+                            <td class="px-4 py-3">
+                                <div class="flex items-center gap-3 min-w-0">
+                                    <div class="min-w-0 flex flex-col">
+                                        <span class="font-medium text-foreground truncate max-w-[150px] sm:max-w-xs" :title="file.name">{{ file.name }}</span>
+                                        <div v-if="file.folder" class="text-xs text-muted-foreground/70 truncate max-w-[150px] sm:max-w-xs font-mono" :title="file.folder">
+                                            {{ file.folder }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            
+                            <!-- Original Size -->
+                            <td class="px-4 py-3 text-right font-mono text-muted-foreground hidden sm:table-cell text-xs">
                                 {{ formatSize(file.originalSize) }}
                             </td>
-                             <td class="px-4 py-3 text-right">
-                                <div v-if="file.status === 'processing'" class="flex items-center justify-end gap-1 text-muted-foreground">
-                                    <Loader2 class="w-3 h-3 animate-spin" />
-                                    <span class="text-xs">處理中...</span>
+                            
+                            <!-- Optimized Size / Status -->
+                            <td class="px-4 py-3 text-right">
+                                <div v-if="file.status === 'processing'" class="flex items-center justify-end gap-1.5 text-primary">
+                                    <Loader2 class="w-3.5 h-3.5 animate-spin" />
+                                    <span class="text-xs font-medium">處理中</span>
                                 </div>
-                                <div v-else-if="file.status === 'done'" class="flex items-center justify-end gap-2">
-                                     <span class="font-mono font-medium text-chart-2">
-                                        {{ formatSize(file.optimizedSize || 0) }}
-                                     </span>
+                                <div v-else-if="file.status === 'done'" class="flex flex-col items-end gap-0.5">
+                                    <span 
+                                       class="font-mono font-bold text-sm" 
+                                       :class="file.optimizedSize && file.optimizedSize < file.originalSize ? 'text-chart-2' : 'text-muted-foreground'"
+                                    >
+                                       {{ formatSize(file.optimizedSize || 0) }}
+                                    </span>
+                                    <span 
+                                       v-if="file.optimizedSize && file.optimizedSize < file.originalSize"
+                                       class="text-[10px] bg-chart-2/10 text-chart-2 px-1 rounded"
+                                    >
+                                       -{{ Math.abs(Math.round(((file.originalSize - file.optimizedSize) / file.originalSize) * 100)) }}%
+                                    </span>
                                 </div>
                                 <div v-else-if="file.status === 'error'" class="text-amber-500 text-xs font-medium flex items-center justify-end gap-1">
                                     <AlertCircle class="w-3 h-3" />
-                                    保留原圖 (過大)
+                                    保留原圖
                                 </div>
-                                <div v-else class="text-muted-foreground text-xs">Waiting...</div>
+                                <div v-else class="text-muted-foreground text-xs opacity-50">-</div>
                             </td>
+                            
+                            <!-- Actions -->
                             <td class="px-4 py-3 text-right">
-                                <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    class="h-8 w-8 text-muted-foreground hover:text-foreground"
-                                    title="預覽"
-                                    @click="openPreview(file)"
-                                >
-                                    <Image class="h-4 w-4" />
-                                </Button>
+                                <div class="flex items-center justify-end gap-1">
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        class="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
+                                        title="預覽"
+                                        @click="openPreview(file)"
+                                    >
+                                        <Image class="h-4 w-4" />
+                                    </Button>
+                                    
+                                    <Button 
+                                        v-if="file.status === 'done' || file.status === 'error'"
+                                        variant="ghost" 
+                                        size="icon" 
+                                        class="h-8 w-8 text-chart-2/80 hover:text-chart-2 hover:bg-chart-2/10"
+                                        @click="downloadFile(file)"
+                                        title="下載"
+                                    >
+                                        <Download class="h-4 w-4" />
+                                    </Button>
+                                    
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        class="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                        @click="removeFile(file)"
+                                        title="移除"
+                                    >
+                                        <X class="h-4 w-4" />
+                                    </Button>
+                                </div>
                             </td>
                         </tr>
                     </tbody>

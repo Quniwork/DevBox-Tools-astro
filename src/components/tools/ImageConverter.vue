@@ -65,10 +65,8 @@ const canvasRef = ref<HTMLCanvasElement | null>(null);
 onMounted(() => {
   isMounted.value = true;
   canvasRef.value = document.createElement('canvas');
-});
-
-// 載入 localStorage 設定
-if (typeof window !== 'undefined') {
+  
+  // 載入 localStorage 設定
   const savedFormat = localStorage.getItem(CONFIG.STORAGE_KEY_FORMAT);
   const savedQuality = localStorage.getItem(CONFIG.STORAGE_KEY_QUALITY);
   const savedCompress = localStorage.getItem(CONFIG.STORAGE_KEY_COMPRESS);
@@ -82,7 +80,9 @@ if (typeof window !== 'undefined') {
   if (savedCompress !== null) {
     enableCompress.value = savedCompress === 'true';
   }
-}
+});
+
+
 
 // Watchers
 watch([selectedFormat, enableCompress, quality], () => {
@@ -455,7 +455,7 @@ const closePreview = () => {
     <div class="flex flex-col xl:flex-row gap-4">
       <!-- 1. 輸出格式設定 -->
       <Card class="p-4 space-y-4 xl:flex-[1.8] border-border/50 shadow-sm">
-        <div class="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-1">
+        <div class="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
           <Settings2 class="h-4 w-4" />
           輸出格式
         </div>
@@ -492,8 +492,8 @@ const closePreview = () => {
       </Card>
 
       <!-- 2. 壓縮設定 -->
-      <Card class="p-4 space-y-4 xl:flex-1 border-border/50 shadow-sm relative overflow-hidden">
-        <div class="flex justify-between items-center mb-1">
+      <Card class="p-4 xl:flex-1 border-border/50 shadow-sm relative overflow-hidden flex flex-col">
+        <div class="flex justify-between items-center mb-3">
           <div class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
             <FileCode class="h-4 w-4" />
             壓縮品質
@@ -516,15 +516,15 @@ const closePreview = () => {
         </div>
 
         <!-- Slider Section -->
-        <div class="py-2 space-y-4">
+        <div class="flex-1 flex flex-col justify-center space-y-4 relative">
             <div class="flex justify-between items-end">
                 <span class="text-xs text-muted-foreground font-medium">品質設定</span>
-                <span class="text-2xl font-bold font-mono tracking-tight" :class="isQualitySupported ? 'text-primary' : 'text-muted-foreground'">
+                <span class="text-xl font-bold font-mono tracking-tight" :class="isQualitySupported ? 'text-primary' : 'text-muted-foreground'">
                     {{ isQualitySupported ? qualityPercent + '%' : 'N/A' }}
                 </span>
             </div>
             
-            <div class="relative h-6 flex items-center">
+            <div class="relative h-6 flex items-center py-1">
                  <input
                     type="range"
                     min="0.1"
@@ -535,26 +535,20 @@ const closePreview = () => {
                     :disabled="!enableCompress || !isQualitySupported"
                     class="quality-slider w-full h-2 rounded-full appearance-none cursor-pointer focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                     :style="{ 
-                        backgroundColor: 'hsl(var(--secondary))',
-                        backgroundImage: `linear-gradient(hsl(var(--primary)), hsl(var(--primary)))`,
-                        backgroundSize: `${qualityPercent}% 100%`,
+                        backgroundColor: 'var(--secondary)',
+                        backgroundImage: `linear-gradient(var(--primary), var(--primary))`,
+                        backgroundSize: `${((quality - 0.1) / 0.9) * 100}% 100%`,
                         backgroundRepeat: 'no-repeat'
                     }"
                 />
             </div>
-            
-            <div class="flex justify-between text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
-                <span>Low Size</span>
-                <span>Best Quality</span>
+            <!-- Not Supported Overlay -->
+            <div v-if="!isQualitySupported" class="absolute inset-0 bg-background/80 backdrop-blur-[1px] flex flex-col items-center justify-center text-center p-4 border-t border-border/10 z-10">
+                <span class="text-sm font-medium text-foreground">此格式不支援品質調整</span>
+                <span class="text-xs text-muted-foreground mt-1">PNG 為無損壓縮格式</span>
             </div>
+            <div v-else-if="!enableCompress" class="absolute inset-0 bg-background/60 backdrop-blur-[1px] z-10"></div>
         </div>
-        
-        <!-- Not Supported Overlay -->
-        <div v-if="!isQualitySupported" class="absolute inset-x-0 bottom-0 top-[60px] bg-background/80 backdrop-blur-[1px] flex flex-col items-center justify-center text-center p-4 border-t border-border/10">
-            <span class="text-sm font-medium text-foreground">此格式不支援品質調整</span>
-            <span class="text-xs text-muted-foreground mt-1">PNG 為無損壓縮格式</span>
-        </div>
-        <div v-else-if="!enableCompress" class="absolute inset-x-0 bottom-0 top-[60px] bg-background/60 backdrop-blur-[1px]"></div>
 
       </Card>
     </div>

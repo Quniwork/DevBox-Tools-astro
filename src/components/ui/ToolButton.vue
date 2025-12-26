@@ -34,6 +34,9 @@ interface Props {
   
   /** 是否為拖曳狀態 (upload 類型專用) */
   dragging?: boolean;
+  
+  /** 變體樣式 (可選，用於特殊樣式如 warning) */
+  variant?: 'default' | 'warning';
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -41,6 +44,7 @@ const props = withDefaults(defineProps<Props>(), {
   loading: false,
   disabled: false,
   dragging: false,
+  variant: 'default',
 });
 
 const emit = defineEmits<{
@@ -83,7 +87,11 @@ const buttonClass = computed(() => {
       classes.push('text-xs', 'text-muted-foreground', 'hover:text-destructive', 'transition-colors');
       break;
     case 'download':
-      classes.push('bg-primary', 'text-white', 'hover:bg-primary/90');
+      if (props.variant === 'warning') {
+        classes.push('bg-chart-2', 'text-white', 'hover:bg-chart-2/90');
+      } else {
+        classes.push('bg-primary', 'text-white', 'hover:bg-primary/90');
+      }
       break;
   }
   
