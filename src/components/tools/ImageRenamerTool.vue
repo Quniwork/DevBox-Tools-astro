@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { Card } from '@/components/ui/card';
-import { Upload, X, GripVertical, Check, Copy, History, Link, Download } from 'lucide-vue-next';
-import DropZone from '@/components/ui/DropZone.vue';
+import { Card, CardContent } from '@/components/ui/card';
+import { Upload, X, GripVertical, Check, Copy, History, Link, Download, FolderSearch, Loader2, RefreshCw, Trash2, FileText } from 'lucide-vue-next';
 import Button from '@/components/ui/Button.vue';
 import ToolButton from '@/components/ui/ToolButton.vue';
 import JSZip from 'jszip';
@@ -50,6 +49,8 @@ const isSiteHistoryOpen = ref(false);
 const images = ref<ImageItem[]>([]);
 const dragIndex = ref<number | null>(null);
 const isDownloading = ref(false);
+const isDragOver = ref(false);
+const showCopied = ref(false);
 
 // ========================================
 // Initialization
@@ -138,10 +139,42 @@ const handleFiles = (fileList: FileList) => {
   images.value = [...images.value, ...newImages];
 };
 
+const handleInput = (e: Event) => {
+    const input = e.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+        handleFiles(input.files);
+    }
+    input.value = '';
+};
+
+// Drag & Drop
+const handleDragOverZone = (e: DragEvent) => {
+    e.preventDefault();
+    isDragOver.value = true;
+};
+
+const handleDragLeaveZone = (e: DragEvent) => {
+    e.preventDefault();
+    isDragOver.value = false;
+};
+
+const handleDropZone = (e: DragEvent) => {
+    e.preventDefault();
+    isDragOver.value = false;
+    if (e.dataTransfer?.files) {
+        handleFiles(e.dataTransfer.files);
+    }
+};
+
 // Remove an image (and revoke URL)
 const removeImage = (index: number) => {
   URL.revokeObjectURL(images.value[index].previewUrl);
   images.value.splice(index, 1);
+};
+
+const clearAll = () => {
+    images.value.forEach(img => URL.revokeObjectURL(img.previewUrl));
+    images.value = [];
 };
 
 // Drag & Drop Sorting
@@ -191,32 +224,22 @@ const usedSuffixes = computed(() => {
 });
 
 // Get Options for a specific image item
-// Logic: filtered by query -> sorted (standard first, used last) -> return
 const getOptionsFor = (item: ImageItem) => {
     const query = item.suffix || '';
     
     // 1. Filter
     let options = CONFIG.SUFFIX_OPTIONS;
     if (query) {
-       // If user is typing, we might want to show matches first
-       // But if exact match exists, we keep it
        options = CONFIG.SUFFIX_OPTIONS.filter(opt => opt.toLowerCase().includes(query.toLowerCase()));
     }
     
     // 2. Sort/Group
-    // We want un-used ones at top, used ones at bottom
-    // BUT exception: if the 'used' one is the CURRENT item's value, it shouldn't be penalized?
-    // Actually, simple logic: if it IS in usedSuffixes AND NOT current item's suffix, push down.
-    
     const currentVal = item.suffix;
-    
     const unused: string[] = [];
     const used: string[] = [];
     
     options.forEach(opt => {
-        // If it is used by SOMEONE
         if (usedSuffixes.value.has(opt)) {
-            // If it is THIS item that uses it, treat as unused (keep at top/normal position)
             if (opt === currentVal) {
                 unused.push(opt);
             } else {
@@ -254,7 +277,6 @@ const handleKeyDown = (e: KeyboardEvent, item: ImageItem) => {
         } else {
             item.highlightedIndex = 0; // Cycle to top
         }
-        scrollIntoView(item.highlightedIndex);
     } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         if (item.highlightedIndex > 0) {
@@ -262,34 +284,12 @@ const handleKeyDown = (e: KeyboardEvent, item: ImageItem) => {
         } else {
             item.highlightedIndex = options.length - 1; // Cycle to bottom
         }
-        scrollIntoView(item.highlightedIndex);
     } else if (e.key === 'Enter') {
         e.preventDefault();
         if (item.highlightedIndex >= 0 && item.highlightedIndex < options.length) {
             selectSuffix(item, options[item.highlightedIndex]);
-             // Trigger blur effectively or close
-             // Wait, handleFiles logic sets focus? No.
-             // We can manually blur or just close.
-             // (selectSuffix closes dropdown)
-             // Optional: Move focus to next input? User didn't ask but it's nice.
-             // sticking to requirements: Enter confirms selection.
-        } else if (options.length === 1) {
-            // Auto select if only 1 match? (Optional, maybe specific request only)
-            // selectSuffix(item, options[0]); 
         }
     }
-};
-
-const scrollIntoView = (index: number) => {
-    // Simple implementation: relying on standard scrollIntoView behavior might interrupt flow?
-    // We can rely on Vue updated hook or nextTick with ref, but let's try simple class logic first.
-    // Actually, proper auto-scroll requires access to DOM elements.
-    // For now we implement visual highlighting and keys. 
-    // If list is long, user might not see highlighting.
-    
-    // We can try to use ID based lookup since we are in a loop
-    // But usually simple arrow nav is acceptable without complex scrolling logic for < 10 items.
-    // CONFIG.SUFFIX_OPTIONS is small (10).
 };
 
 
@@ -323,13 +323,18 @@ const copyToClipboard = async () => {
     if (!generatedList.value) return;
     try {
         await navigator.clipboard.writeText(generatedList.value);
+        showCopied.value = true;
+        setTimeout(() => showCopied.value = false, 2000);
     } catch (err) {
         console.error('Failed to copy', err);
     }
 };
 
 const downloadAllImages = async () => {
-    if (images.value.length === 0 || !siteName.value.trim()) return;
+    if (images.value.length === 0 || !siteName.value.trim()) {
+        alert('請先輸入網站名稱並上傳圖片');
+        return;
+    }
     
     isDownloading.value = true;
     try {
@@ -449,28 +454,28 @@ const getCanvasBlob = (img: HTMLImageElement, quality: number, scale: number = 1
 
 <template>
   <div class="space-y-6">
-    <!-- Top Row: Config & Upload (Side by Side) -->
-    <div class="grid gap-6 lg:grid-cols-2">
-      
-      <!-- 1. Configuration Section -->
-      <Card class="border-border bg-card p-5 flex flex-col h-full">
-        <div class="flex items-center gap-2 mb-4">
-            <div class="w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center">
-                <Link class="w-5 h-5 text-primary" />
+  
+    <!-- 1. Configuration Section -->
+    <Card class="border-border bg-card p-5 border-l-4 border-l-primary shadow-sm">
+        <div class="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <Link class="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                   <h3 class="text-base font-semibold text-foreground">網站設定</h3>
+                   <p class="text-xs text-muted-foreground mt-0.5">所有圖片將自動命名並壓縮 (JPG &lt;600KB)</p>
+                </div>
             </div>
-            <h3 class="text-base font-semibold text-foreground">網站設定</h3>
-        </div>
-        
-        <div class="flex-1 flex flex-col gap-4">
-            <div class="space-y-2">
-                <div class="relative">
+            
+            <div class="relative w-full md:w-auto md:min-w-[300px]">
                   <input
                     v-model="siteName"
                     type="text"
-                    placeholder="請輸入網站名稱"
+                    placeholder="請輸入網站名稱 (例如: my-casino)"
                     @focus="isSiteHistoryOpen = true"
                     @blur="closeSiteHistoryDelay"
-                    class="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm transition-all font-mono"
+                    class="w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm transition-all font-mono"
                   />
                     <!-- History Dropdown -->
                     <div 
@@ -498,168 +503,203 @@ const getCanvasBlob = (img: HTMLImageElement, quality: number, scale: number = 1
                             </button>
                         </div>
                     </div>
-                </div>
-            </div>
-            
-            <div class="rounded-lg p-4">
-                <p class="text-xs text-muted-foreground mb-1">提示：</p>
-                <ul class="text-xs text-muted-foreground list-disc list-inside space-y-1">
-                    <li>輸入站名後會自動儲存至歷史紀錄。</li>
-                    <li>所有圖片將自動轉為 JPG 格式。</li>
-                    <li>圖片大小會自動壓縮至 600KB 以下。</li>
-                    <li>在後綴選單中，已使用的項目會下沉並變淡。</li>
-                </ul>
             </div>
         </div>
-      </Card>
+    </Card>
 
-      <!-- 2. Image Upload Section -->
-      <div class="flex flex-col h-full">
-         <DropZone
-            accept="image/*"
-            :multiple="true"
-            title="上傳圖片"
-            hint="支援多檔上傳 (JPG, PNG, WebP...)"
-            @files="handleFiles"
-            class="h-full min-h-[300px]"
-         >
-             <template #icon>
-                 <Upload class="h-6 w-6 text-foreground" />
-             </template>
-         </DropZone>
-      </div>
+    <!-- 2. Action Bar / Empty State -->
+    
+    <!-- Empty State -->
+    <Card 
+        v-if="images.length === 0"
+        class="border-2 border-dashed transition-colors duration-200"
+        :class="isDragOver ? 'border-primary bg-primary/5' : 'border-border bg-card'"
+        @dragenter="handleDragOverZone"
+        @dragover="handleDragOverZone"
+        @dragleave="handleDragLeaveZone"
+        @drop="handleDropZone"
+    >
+        <CardContent class="flex flex-col items-center justify-center py-12 text-center space-y-4">
+            <div class="p-4 bg-primary/10 rounded-full">
+                <FolderSearch v-if="!isDragOver" class="w-10 h-10 text-primary" />
+                <Upload v-else class="w-10 h-10 text-primary" />
+            </div>
+            <div class="space-y-2">
+                <h3 class="text-xl font-semibold">圖片排序與命名</h3>
+                <p class="text-sm text-muted-foreground max-w-sm mx-auto">
+                    拖曳圖片至此 或 點擊選擇<br/>
+                    <span class="text-xs opacity-70">支援多選，自動轉為 JPG</span>
+                </p>
+            </div>
+            
+            <div class="flex gap-4">
+                <div class="relative">
+                    <Button variant="default" class="cursor-pointer">
+                        選擇圖片
+                    </Button>
+                    <input 
+                        type="file" 
+                        accept="image/*"
+                         multiple
+                        class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        @change="handleInput"
+                    />
+                </div>
+            </div>
+        </CardContent>
+    </Card>
+
+    <!-- Action Bar (When Files Exist) -->
+    <div v-else class="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl border border-border bg-card p-4 shadow-sm">
+         <div class="flex items-center gap-3 w-full sm:w-auto">
+             <div class="relative group w-full sm:w-auto">
+                 <input
+                    type="file"
+                    accept="image/*"
+                     multiple
+                    class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    @change="handleInput"
+                    title="繼續上傳"
+                />
+                <Button 
+                    variant="outline" 
+                    class="w-full sm:w-auto gap-2"
+                >
+                    <Upload class="h-4 w-4" />
+                    繼續上傳
+                </Button>
+             </div>
+             
+             <div class="h-6 w-px bg-border mx-1 hidden sm:block"></div>
+             
+             <div class="flex items-center gap-2 text-sm">
+                 <span class="font-medium">{{ images.length }} 張圖片</span>
+             </div>
+         </div>
+         
+         <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+             <ToolButton 
+              type="clear" 
+              label="清空"
+              @click="clearAll" 
+            />
+            <ToolButton 
+              type="copy" 
+              label="複製結果"
+              :copied="showCopied"
+              @click="copyToClipboard"
+            />
+            <ToolButton 
+              type="download" 
+              label="打包下載"
+              :loading="isDownloading"
+              @click="downloadAllImages"
+            />
+         </div>
     </div>
 
-    <!-- 3. Image Sorting & Naming List -->
-    <Card v-if="images.length > 0" class="border-border bg-card p-5">
-        <div class="flex items-center justify-between mb-4">
-             <div class="flex items-center gap-2">
-                <div class="w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center">
-                    <History class="w-5 h-5 text-primary" />
-                </div>
-                <h3 class="text-base font-semibold text-foreground">圖片排序與命名 ({{ images.length }} 張)</h3>
+    <!-- 3. Image Grid -->
+    <div v-if="images.length > 0" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+        <div
+            v-for="(img, index) in images"
+            :key="img.id"
+            class="group relative flex flex-col rounded-xl border bg-card text-card-foreground shadow-sm transition-all overflow-hidden"
+            :class="{ 'border-primary ring-2 ring-primary/20': dragIndex === index, 'hover:shadow-md hover:border-primary/50': dragIndex === null }"
+            draggable="true"
+            @dragstart="onDragStart($event, index)"
+            @dragover="onDragOver"
+            @drop="onDrop($event, index)"
+        >
+            <!-- Drag Handle & Remove -->
+            <div class="absolute right-2 top-2 z-20 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button @click="removeImage(index)" class="rounded-full bg-background/80 p-1.5 text-destructive hover:bg-destructive hover:text-white backdrop-blur-sm shadow-sm transition-colors">
+                    <X class="h-3.5 w-3.5" />
+                </button>
             </div>
             
-            <ToolButton 
-              type="clear" 
-              label="清空所有"
-              @click="images = []" 
-            />
-        </div>
+            <div class="absolute left-2 top-2 z-20 opacity-0 transition-opacity group-hover:opacity-100 cursor-move">
+                <div class="rounded-full bg-background/80 p-1.5 text-foreground backdrop-blur-sm shadow-sm">
+                        <GripVertical class="h-3.5 w-3.5" />
+                </div>
+            </div>
+            
+             <div class="absolute left-2 top-2 z-10" v-if="!img.isDropdownOpen">
+                 <div class="bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded font-mono backdrop-blur-sm">
+                     #{{ index + 1 }}
+                 </div>
+            </div>
 
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
-            <div
-                v-for="(img, index) in images"
-                :key="img.id"
-                class="group relative flex flex-col rounded-lg border bg-card text-card-foreground shadow-sm transition-all"
-                :class="{ 'border-primary ring-1 ring-primary': dragIndex === index, 'hover:shadow-md': dragIndex === null }"
-                draggable="true"
-                @dragstart="onDragStart($event, index)"
-                @dragover="onDragOver"
-                @drop="onDrop($event, index)"
-            >
-                <!-- Drag Handle & Remove -->
-                <div class="absolute right-2 top-2 z-10 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                     <button @click="removeImage(index)" class="rounded-full bg-background/80 p-1 text-destructive hover:bg-destructive hover:text-destructive-foreground backdrop-blur-sm">
-                        <X class="h-4 w-4" />
-                    </button>
+            <!-- Preview Image -->
+            <div class="aspect-video w-full overflow-hidden bg-secondary relative">
+                <img :src="img.previewUrl" class="h-full w-full object-cover object-top" />
+            </div>
+
+            <!-- Controls -->
+            <div class="p-3 space-y-2 border-t border-border">
+                <div class="text-xs text-muted-foreground font-mono truncate" :title="img.file.name">
+                    {{ img.file.name }}
                 </div>
                 
-                <div class="absolute left-2 top-2 z-10 opacity-0 transition-opacity group-hover:opacity-100 cursor-move">
-                    <div class="rounded-full bg-background/80 p-1 text-foreground backdrop-blur-sm">
-                         <GripVertical class="h-4 w-4" />
-                    </div>
-                </div>
-
-                <!-- Preview Image -->
-                <div class="aspect-video w-full overflow-hidden rounded-t-lg bg-muted">
-                    <img :src="img.previewUrl" class="h-full w-full object-cover object-top" />
-                </div>
-
-                <!-- Controls -->
-                <div class="p-3 space-y-2">
-                    <div class="text-xs text-muted-foreground font-mono truncate">
-                        {{ index + 1 }}. {{ img.file.name }}
-                    </div>
-                    
-                    <!-- Custom Searchable Dropdown -->
-                    <div class="relative">
-                        <input
-                            type="text"
-                            v-model="img.suffix"
-                            @focus="img.isDropdownOpen = true"
-                            @blur="closeDropdownDelay(img)"
-                            @keydown="handleKeyDown($event, img)"
-                            placeholder="選擇或輸入後綴..."
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                        />
-                        <!-- Dropdown Options -->
-                        <div 
-                            v-if="img.isDropdownOpen"
-                            class="absolute z-20 mt-1 max-h-[200px] w-full overflow-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md"
+                <!-- Custom Searchable Dropdown -->
+                <div class="relative">
+                    <input
+                        type="text"
+                        v-model="img.suffix"
+                        @focus="img.isDropdownOpen = true"
+                        @blur="closeDropdownDelay(img)"
+                        @keydown="handleKeyDown($event, img)"
+                        placeholder="選擇或輸入後綴..."
+                        class="flex h-8 w-full rounded-md border border-input bg-background/50 px-2.5 py-1 text-xs shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                    <!-- Dropdown Options -->
+                    <div 
+                        v-if="img.isDropdownOpen"
+                        class="absolute bottom-full left-0 z-30 mb-1 max-h-[160px] w-full overflow-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md"
+                    >
+                        <div
+                            v-for="(option, optIndex) in getOptionsFor(img)"
+                            :key="option"
+                            @click="selectSuffix(img, option)"
+                            class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-xs outline-none data-disabled:pointer-events-none data-disabled:opacity-50"
+                            :class="{
+                                'bg-accent text-accent-foreground': img.highlightedIndex === optIndex,
+                                'hover:bg-accent hover:text-accent-foreground': img.highlightedIndex !== optIndex,
+                                'text-muted-foreground opacity-60': isOptionUsed(option, img.suffix)
+                            }"
                         >
-                            <div
-                                v-for="(option, optIndex) in getOptionsFor(img)"
-                                :key="option"
-                                @click="selectSuffix(img, option)"
-                                class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none data-disabled:pointer-events-none data-disabled:opacity-50"
-                                :class="{
-                                    'bg-accent text-accent-foreground': img.highlightedIndex === optIndex,
-                                    'hover:bg-accent hover:text-accent-foreground': img.highlightedIndex !== optIndex,
-                                    'text-muted-foreground opacity-60': isOptionUsed(option, img.suffix)
-                                }"
-                            >
-                                <span :class="{ 'line-through': isOptionUsed(option, img.suffix) && false }">
-                                    {{ option }}
-                                </span>
-                                <Check v-if="img.suffix === option" class="ml-auto h-4 w-4" />
-                                <span v-if="isOptionUsed(option, img.suffix)" class="ml-auto text-[10px] uppercase border px-1 rounded opacity-50">Used</span>
-                            </div>
-                            
-                            <div v-if="getOptionsFor(img).length === 0" class="px-2 py-1.5 text-sm text-muted-foreground">
-                                無相符選項
-                            </div>
+                            <span :class="{ 'line-through': isOptionUsed(option, img.suffix) && false }">
+                                {{ option }}
+                            </span>
+                            <Check v-if="img.suffix === option" class="ml-auto h-3 w-3" />
+                            <span v-if="isOptionUsed(option, img.suffix)" class="ml-auto text-[9px] uppercase border px-1 rounded opacity-50">Used</span>
+                        </div>
+                        
+                        <div v-if="getOptionsFor(img).length === 0" class="px-2 py-1.5 text-xs text-muted-foreground">
+                            無相符選項
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-    </Card>
-
-    <!-- 4. Result Output -->
-    <Card v-if="images.length > 0 || siteName" class="border-border bg-card p-5">
-        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
-             <div class="flex items-center gap-2">
-                <div class="w-9 h-9 rounded-lg bg-chart-2/20 flex items-center justify-center">
-                    <Check class="w-5 h-5 text-chart-2" />
-                </div>
-                <h3 class="text-base font-semibold text-foreground">產生結果</h3>
-            </div>
-            
-            <div class="flex w-full sm:w-auto gap-2">
-                 <Button size="sm" variant="outline" @click="copyToClipboard" class="flex-1 sm:flex-none">
-                    <Copy class="mr-2 h-4 w-4" />
-                    複製結果
-                </Button>
-                 <Button size="sm" @click="downloadAllImages" :disabled="isDownloading" class="flex-1 sm:flex-none bg-primary text-white hover:bg-primary/90">
-                    <Download v-if="!isDownloading" class="mr-2 h-4 w-4" />
-                    <span v-else class="mr-2 h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                    {{ isDownloading ? '打包中...' : '打包下載' }}
-                </Button>
-            </div>
-        </div>
-        
-        <div class="rounded-md bg-muted p-4 font-mono text-sm overflow-x-auto whitespace-pre leading-relaxed">
+    </div>
+    
+     <!-- 4. Result Preview (Optional/At Bottom) -->
+    <div v-if="images.length > 0" class="rounded-lg border border-border bg-muted/30 p-4">
+         <div class="flex items-center gap-2 mb-2 text-sm text-muted-foreground font-medium">
+             <FileText class="w-4 h-4" />
+             預覽結果列表
+         </div>
+         <div class="font-mono text-xs text-muted-foreground/80 whitespace-pre overflow-x-auto leading-relaxed max-h-[150px] overflow-y-auto">
 {{ generatedList || '尚未產生結果...' }}
-        </div>
-    </Card>
+         </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
 /* Optional: Better scrollbar for dropdown */
 .overflow-auto::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
 }
 .overflow-auto::-webkit-scrollbar-track {
   background: transparent;
@@ -667,5 +707,9 @@ const getCanvasBlob = (img: HTMLImageElement, quality: number, scale: number = 1
 .overflow-auto::-webkit-scrollbar-thumb {
   background-color: hsl(var(--muted-foreground) / 0.3);
   border-radius: 3px;
+}
+
+button {
+  cursor: pointer;
 }
 </style>

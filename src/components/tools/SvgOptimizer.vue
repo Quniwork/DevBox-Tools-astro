@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import Button from '@/components/ui/Button.vue';
 import ToolButton from '@/components/ui/ToolButton.vue';
-import DropZone from '@/components/ui/DropZone.vue';
-import { Upload, Download, Copy, RefreshCw, FileCode, Check, ArrowRight, Layers, File, X, DownloadCloud } from 'lucide-vue-next';
-import { formatSize, generateId, downloadAsZip, downloadBlob } from '@/composables/useFileUtils';
+import { Upload, Download, Copy, RefreshCw, FileCode, Check, ArrowRight, Layers, File, X, Loader2, FolderSearch, Trash2, CheckCircle2 } from 'lucide-vue-next';
+import { formatSize, generateId } from '@/composables/useFileUtils';
 
 // ========================================
 // 共用狀態
@@ -400,11 +399,11 @@ const batchTotalSavings = computed(() => {
          單一模式
          ======================================== -->
     <div v-show="activeTab === 'single'" class="space-y-4">
-      <!-- Action Bar -->
-      <div class="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl border border-border bg-card p-4">
-        <div class="flex items-center gap-4 w-full sm:w-auto">
+      <!-- Action Bar (Consistent Style) -->
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl border border-border bg-card p-4 shadow-sm">
+        <div class="flex items-center gap-3 w-full sm:w-auto">
           <div 
-            class="relative group"
+            class="relative group w-full sm:w-auto"
             @dragover="handleDragOverSingle"
             @dragleave="handleDragLeaveSingle"
             @drop="handleDropSingle"
@@ -424,43 +423,39 @@ const batchTotalSavings = computed(() => {
               上傳 SVG
             </Button>
           </div>
-          <div class="h-4 w-px bg-border hidden sm:block"></div>
-          <div v-if="originalSize > 0" class="flex gap-4 text-sm">
-            <div class="flex flex-col">
-              <span class="text-xs text-muted-foreground">原始大小</span>
-              <span class="font-medium font-mono text-foreground">{{ formatSize(originalSize) }}</span>
-            </div>
-            <ArrowRight class="h-4 w-4 text-muted-foreground my-auto" />
-            <div class="flex flex-col">
-              <span class="text-xs text-muted-foreground">優化後</span>
-              <span class="font-medium font-mono text-chart-2">{{ formatSize(optimizedSize) }}</span>
-            </div>
-            <div v-if="savings > 0" class="flex items-center">
-              <span class="rounded-full bg-chart-2/20 px-2 py-0.5 text-xs font-medium text-chart-2">
-                -{{ savings }}%
-              </span>
-            </div>
+          
+          <div class="h-6 w-px bg-border hidden sm:block mx-1"></div>
+          
+          <div v-if="originalSize > 0" class="flex items-center gap-3 text-sm">
+             <div class="flex items-center gap-1.5 bg-secondary/50 px-2 py-1 rounded-md">
+                 <span class="text-xs text-muted-foreground">原始</span>
+                 <span class="font-medium font-mono text-foreground">{{ formatSize(originalSize) }}</span>
+                 <ArrowRight class="h-3 w-3 text-muted-foreground" />
+                 <span class="font-medium font-mono text-chart-2">{{ formatSize(optimizedSize) }}</span>
+                 <span v-if="savings !== 0" class="text-xs font-bold" :class="savings > 0 ? 'text-chart-2' : 'text-destructive'">
+                     (-{{ savings }}%)
+                 </span>
+             </div>
           </div>
         </div>
         
-        <div class="flex items-center gap-2 w-full sm:w-auto">
+        <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
           <ToolButton 
             v-if="inputSvg" 
             type="clear" 
-            label="清除"
             @click="clearAll" 
           />
           <ToolButton 
             v-if="outputSvg" 
             type="copy" 
-            label="複製代碼"
+            label="複製"
             :copied="showCopied"
             @click="copyToClipboard"
           />
           <ToolButton 
             v-if="outputSvg" 
             type="download" 
-            label="下載 SVG"
+            label="下載"
             @click="downloadSvg"
           />
         </div>
@@ -469,8 +464,8 @@ const batchTotalSavings = computed(() => {
       <!-- Main Editor Area -->
       <div class="grid gap-4 lg:grid-cols-2 h-[500px]">
         <!-- Input -->
-        <Card class="flex flex-col overflow-hidden border-border bg-card">
-          <div class="flex items-center justify-between border-b border-border px-4 py-3">
+        <Card class="flex flex-col overflow-hidden border-border bg-card shadow-sm">
+          <div class="flex items-center justify-between border-b border-border px-4 py-3 bg-muted/30">
             <div class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
               <FileCode class="h-4 w-4" />
               原始 SVG 原始碼
@@ -484,13 +479,13 @@ const batchTotalSavings = computed(() => {
           ></textarea>
           
           <!-- Add Class Option -->
-          <div class="border-t border-border px-4 py-3">
+          <div class="border-t border-border px-4 py-3 bg-muted/10">
             <div class="flex items-center gap-3">
               <label class="flex items-center gap-2 cursor-pointer select-none">
                 <input 
                   type="checkbox" 
                   v-model="enableClass"
-                  class="custom-checkbox"
+                  class="custom-checkbox h-4 w-4 rounded border-border text-primary focus:ring-primary"
                 />
                 <span class="text-sm text-foreground whitespace-nowrap">添加 Class</span>
               </label>
@@ -506,32 +501,31 @@ const batchTotalSavings = computed(() => {
         </Card>
 
         <!-- Output Preview -->
-        <Card class="flex flex-col overflow-hidden border-border bg-card">
-          <div class="flex items-center justify-between border-b border-border px-4 py-3">
+        <Card class="flex flex-col overflow-hidden border-border bg-card shadow-sm">
+          <div class="flex items-center justify-between border-b border-border px-4 py-3 bg-muted/30">
             <div class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
+              <CheckCircle2 v-if="outputSvg" class="h-4 w-4 text-chart-2" />
+              <Layers v-else class="h-4 w-4" />
               整理結果
             </div>
-            <span v-if="showCopied" class="text-xs text-primary transition-opacity">已複製到剪貼簿</span>
+            <span v-if="showCopied" class="text-xs text-primary font-medium animate-pulse">已複製到剪貼簿</span>
           </div>
           
           <div class="flex flex-1 flex-col overflow-hidden">
             <!-- Preview Box -->
-            <div class="flex flex-1 items-center justify-center p-6 bg-secondary/30 overflow-hidden min-h-[200px]">
-              <div v-if="outputSvg" class="svg-preview-container flex items-center justify-center">
-                <img :src="outputDataUrl" alt="Optimized SVG Preview" class="svg-preview-image" />
+            <div class="flex flex-1 items-center justify-center p-6 min-h-[200px] overflow-hidden relative bg-gradient-to-br from-secondary/30 to-secondary/10">
+              <div v-if="outputSvg" class="relative z-10 svg-preview-container flex items-center justify-center w-full h-full">
+                <img :src="outputDataUrl" alt="Optimized SVG Preview" class="svg-preview-image max-w-full max-h-full object-contain drop-shadow-lg" />
               </div>
-              <div v-else class="text-sm text-muted-foreground">
-                尚無預覽
+              <div v-else class="relative z-10 text-sm text-muted-foreground/50 flex flex-col items-center gap-2">
+                 <File class="w-8 h-8 opacity-20" />
+                 <span>尚無預覽</span>
               </div>
             </div>
             
             <!-- Code Preview -->
             <div class="flex-1 border-t border-border bg-background p-4 min-h-[150px]">
-              <div class="h-full overflow-auto font-mono text-xs text-foreground leading-relaxed">
+              <div class="h-full overflow-auto font-mono text-xs text-foreground leading-relaxed custom-scrollbar">
                 {{ outputSvg || '結果將顯示於此...' }}
               </div>
             </div>
@@ -545,85 +539,67 @@ const batchTotalSavings = computed(() => {
          ======================================== -->
     <div v-show="activeTab === 'batch'" class="space-y-4">
       
-      <!-- Drop Zone (只在沒有檔案時顯示) -->
-      <DropZone
-        v-if="batchItems.length === 0"
-        accept=".svg"
-        :multiple="true"
-        title="批量上傳 SVG 檔案"
-        subtitle="拖放多個 SVG 檔案到這裡，或點擊選擇"
-        hint="自動壓縮，不添加 class"
-        @files="processBatchFiles"
-      >
-        <template #icon>
-          <Upload class="h-6 w-6 text-muted-foreground" />
-        </template>
-      </DropZone>
-
-      <!-- Action Bar -->
-      <div class="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl border border-border bg-card p-4" v-if="batchItems.length > 0">
-        <div class="flex items-center gap-4 w-full sm:w-auto">
-          <!-- 上傳按鈕 (支援拖曳) -->
-          <div 
-            class="relative group"
+       <!-- Standard Action Bar (Show when files exist) -->
+      <div v-if="batchItems.length > 0" class="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl border border-border bg-card p-4 shadow-sm">
+        <div class="flex items-center gap-3 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+           <!-- Single Upload Button Group -->
+           <div 
+            class="relative group w-full sm:w-auto"
             @dragover="handleDragOverBatch"
             @dragleave="handleDragLeaveBatch"
             @drop="handleDropBatch"
-          >
-            <input
+           >
+             <input
               type="file"
               accept=".svg"
               multiple
               class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
               @change="handleBatchFileInput"
+              title="上傳 SVG"
             />
             <Button 
-              variant="outline" 
-              class="w-full sm:w-auto gap-2"
-              :class="isDraggingBatch ? 'border-primary bg-primary/10' : ''"
+                variant="outline" 
+                class="w-full sm:w-auto gap-2"
+                :class="isDraggingBatch ? 'border-primary bg-primary/10' : ''"
             >
-              <Upload class="h-4 w-4" />
-              上傳 SVG
+                <Upload class="h-4 w-4" />
+                繼續上傳
             </Button>
-          </div>
-          
-          <div class="flex gap-4 text-sm">
-            <div class="flex items-center gap-2">
-              <span class="text-xs text-muted-foreground">共</span>
-              <span class="font-medium text-foreground">{{ batchItems.length }}</span>
-              <span class="text-xs text-muted-foreground">個檔案</span>
-            </div>
-            <div class="h-4 w-px bg-border"></div>
-            <div class="flex items-center gap-2">
-              <span class="text-xs text-muted-foreground">總計節省</span>
-              <span class="font-medium font-mono text-chart-2">{{ formatSize(batchTotalOriginalSize - batchTotalOptimizedSize) }}</span>
-            </div>
-            <div v-if="batchTotalSavings !== 0" class="flex items-center">
-              <span 
-                class="rounded-full px-2 py-0.5 text-xs font-medium"
-                :class="batchTotalSavings > 0 ? 'bg-chart-2/20 text-chart-2' : 'bg-destructive/20 text-destructive'"
-              >
-                {{ batchTotalSavings > 0 ? '-' : '' }}{{ Math.abs(batchTotalSavings) }}%
-              </span>
-            </div>
-          </div>
+           </div>
+           
+           <div class="h-6 w-px bg-border mx-1 hidden sm:block"></div>
+
+           <!-- Stats -->
+           <div class="flex items-center gap-3 text-sm whitespace-nowrap">
+              <span class="font-medium">{{ batchItems.length }} 個檔案</span>
+               <template v-if="batchTotalSavings !== 0">
+                 <span class="text-muted-foreground hidden sm:inline">•</span>
+                 <div class="flex items-center gap-1.5 bg-secondary/50 px-2 py-1 rounded-md">
+                    <span class="text-xs text-muted-foreground">共節省</span>
+                    <span class="font-medium text-chart-2">{{ formatSize(batchTotalOriginalSize - batchTotalOptimizedSize) }}</span>
+                    <span 
+                        class="text-xs font-bold"
+                        :class="batchTotalSavings > 0 ? 'text-chart-2' : 'text-destructive'"
+                    >
+                        (-{{ Math.abs(batchTotalSavings) }}%)
+                    </span>
+                 </div>
+              </template>
+           </div>
         </div>
-        
-        <div class="flex items-center gap-2 w-full sm:w-auto">
+
+        <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
           <ToolButton 
-            v-if="batchItems.length > 0" 
             type="clear" 
             @click="clearBatchItems" 
           />
-          <ToolButton 
-            v-if="batchItems.length > 0" 
+           <ToolButton 
             type="copy" 
             label="複製全部"
             :copied="batchShowCopied === 'all'"
             @click="copyAllBatch"
           />
           <ToolButton 
-            v-if="batchItems.length > 0" 
             type="download" 
             label="下載全部"
             :loading="isDownloadingAll"
@@ -632,75 +608,139 @@ const batchTotalSavings = computed(() => {
         </div>
       </div>
 
-      <!-- Batch Items List -->
-      <div v-if="batchItems.length > 0" class="space-y-2">
-        <div 
-          v-for="item in batchItems" 
-          :key="item.id"
-          class="flex items-center gap-4 p-4 rounded-xl border border-border bg-card group"
+      <!-- Standard Large Drop Zone (Show when no files) -->
+       <Card 
+            v-if="batchItems.length === 0"
+            class="border-2 border-dashed transition-colors duration-200"
+            :class="isDraggingBatch ? 'border-primary bg-primary/5' : 'border-border bg-card'"
+            @dragenter="handleDragOverBatch"
+            @dragover="handleDragOverBatch"
+            @dragleave="handleDragLeaveBatch"
+            @drop="handleDropBatch"
         >
-          <!-- Preview Thumbnail -->
-          <div 
-            class="w-14 h-14 rounded-lg overflow-hidden bg-secondary shrink-0 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
-            @click="openBatchPreview(item)"
-            title="點擊預覽"
-          >
-            <img 
-              :src="item.previewUrl" 
-              :alt="item.name"
-              class="w-full h-full object-contain p-1"
-            />
-          </div>
+            <CardContent class="flex flex-col items-center justify-center py-10 text-center space-y-4">
+                <div class="p-4 bg-primary/10 rounded-full">
+                    <Upload v-if="!isDraggingBatch" class="w-10 h-10 text-primary" />
+                    <FolderSearch v-else class="w-10 h-10 text-primary" />
+                </div>
+                <div class="space-y-2">
+                    <h3 class="text-xl font-semibold">批量 SVG 壓縮</h3>
+                    <p class="text-sm text-muted-foreground max-w-sm mx-auto">
+                        拖曳 SVG 檔案至此 或 點擊選擇<br/>
+                        <span class="text-xs opacity-70">自動移除冗餘代碼與空白</span>
+                    </p>
+                </div>
+                
+                <div class="flex gap-4">
+                    <div class="relative">
+                        <Button variant="default" class="cursor-pointer">
+                            選擇 SVG 檔案
+                        </Button>
+                        <input 
+                            type="file" 
+                            accept=".svg"
+                            multiple 
+                            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            @change="handleBatchFileInput"
+                        />
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
 
-          <!-- File Info -->
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 mb-1">
-              <FileCode class="h-4 w-4 text-muted-foreground shrink-0" />
-              <span class="text-sm font-medium text-foreground truncate">{{ item.name }}</span>
-            </div>
-            <div class="flex items-center gap-3 text-xs text-muted-foreground">
-              <span class="font-mono">{{ formatSize(item.originalSize) }}</span>
-              <ArrowRight class="h-3 w-3" />
-              <span class="font-mono text-chart-2">{{ formatSize(item.optimizedSize) }}</span>
-              <span class="rounded-full bg-chart-2/20 px-1.5 py-0.5 text-[10px] font-medium text-chart-2">
-                -{{ item.savings }}%
-              </span>
-            </div>
-          </div>
-
-          <!-- Actions -->
-          <div class="flex items-center gap-1 shrink-0">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              @click="copyBatchItem(item)"
-              class="h-8 w-8"
-              title="複製"
-            >
-              <Check v-if="batchShowCopied === item.id" class="h-4 w-4 text-chart-2" />
-              <Copy v-else class="h-4 w-4" />
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              @click="downloadBatchItem(item)"
-              class="h-8 w-8"
-              title="下載"
-            >
-              <Download class="h-4 w-4" />
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              @click="removeBatchItem(item.id)"
-              class="h-8 w-8 text-muted-foreground hover:text-destructive"
-              title="移除"
-            >
-              <X class="h-4 w-4" />
-            </Button>
-          </div>
+      <!-- Standard Table List -->
+       <Card v-if="batchItems.length > 0" class="bg-card overflow-hidden shadow-sm border-border/50">
+        <div class="max-h-[600px] overflow-y-auto custom-scrollbar">
+            <table class="w-full text-sm text-left border-collapse">
+                <thead class="bg-muted/50 text-muted-foreground font-medium sticky top-0 z-10 backdrop-blur-md">
+                    <tr>
+                        <th class="px-4 py-3 w-[40%]">檔案名稱</th>
+                        <th class="px-4 py-3 text-right w-[15%] hidden sm:table-cell">原始</th>
+                        <th class="px-4 py-3 text-right w-[25%]">優化後</th>
+                        <th class="px-4 py-3 text-right w-[20%]">操作</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-border">
+                    <tr v-for="item in batchItems" :key="item.id" class="group hover:bg-muted/30 transition-colors">
+                        <td class="px-4 py-3">
+                            <div class="flex items-center gap-3">
+                                <!-- Thumbnail -->
+                                <div 
+                                    class="w-12 h-12 rounded-lg overflow-hidden bg-secondary/50 shrink-0 cursor-pointer ring-1 ring-border group-hover:ring-primary/50 transition-all flex items-center justify-center p-1"
+                                    @click="openBatchPreview(item)"
+                                >
+                                    <img 
+                                        :src="item.previewUrl" 
+                                        :alt="item.name"
+                                        class="max-w-full max-h-full object-contain"
+                                    />
+                                </div>
+                                <div class="min-w-0 flex flex-col">
+                                    <span class="font-medium text-foreground truncate max-w-[150px] sm:max-w-xs" :title="item.name">{{ item.name }}</span>
+                                </div>
+                            </div>
+                        </td>
+                        
+                        <td class="px-4 py-3 text-right font-mono text-muted-foreground hidden sm:table-cell text-xs">
+                            {{ formatSize(item.originalSize) }}
+                        </td>
+                        
+                        <td class="px-4 py-3 text-right">
+                             <div class="flex flex-col items-end gap-0.5">
+                                 <span 
+                                    class="font-mono font-bold text-sm" 
+                                    :class="item.optimizedSize < item.originalSize ? 'text-chart-2' : 'text-muted-foreground'"
+                                 >
+                                    {{ formatSize(item.optimizedSize) }}
+                                 </span>
+                                 <span 
+                                    v-if="item.savings !== 0"
+                                    class="text-[10px] bg-chart-2/10 text-chart-2 px-1 rounded"
+                                 >
+                                    -{{ Math.abs(item.savings) }}%
+                                 </span>
+                             </div>
+                        </td>
+                        
+                        <td class="px-4 py-3 text-right">
+                            <div class="flex items-center justify-end gap-1">
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    class="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
+                                    title="複製代碼"
+                                    @click="copyBatchItem(item)"
+                                >
+                                    <Check v-if="batchShowCopied === item.id" class="h-4 w-4 text-chart-2" />
+                                    <Copy v-else class="h-4 w-4" />
+                                </Button>
+                                
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    class="h-8 w-8 text-chart-2/80 hover:text-chart-2 hover:bg-chart-2/10"
+                                    @click="downloadBatchItem(item)"
+                                    title="下載"
+                                >
+                                    <Download class="h-4 w-4" />
+                                </Button>
+                                
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    class="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                    @click="removeBatchItem(item.id)"
+                                    title="移除"
+                                >
+                                    <Trash2 class="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
-      </div>
+    </Card>
     </div>
 
     <!-- SVG Preview Modal (僅在客戶端 mounted 後渲染) -->
@@ -708,46 +748,63 @@ const batchTotalSavings = computed(() => {
       <Transition name="modal">
         <div 
           v-if="batchPreviewItem" 
-          class="fixed inset-0 z-50 flex items-center justify-center p-4"
+          class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8"
           @click.self="closeBatchPreview"
         >
           <!-- Backdrop -->
-          <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" @click="closeBatchPreview"></div>
+          <div class="absolute inset-0 bg-black/90 backdrop-blur-md" @click="closeBatchPreview"></div>
           
           <!-- Modal Content -->
-          <div class="relative z-10 max-w-[90vw] max-h-[90vh] flex flex-col">
-            <!-- Close Button -->
-            <button 
-              @click="closeBatchPreview"
-              class="absolute -top-10 right-0 text-white/70 hover:text-white transition-colors"
-            >
-              <X class="h-6 w-6" />
-            </button>
+          <div class="relative z-10 w-full h-full max-w-7xl flex flex-col">
+            <!-- Top Bar -->
+            <div class="flex items-center justify-between mb-4 px-2">
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="w-10 h-10 rounded-lg bg-white/10 backdrop-blur-sm flex items-center justify-center shrink-0">
+                  <FileCode class="w-5 h-5 text-white" />
+                </div>
+                <div class="min-w-0">
+                  <h3 class="text-white font-medium truncate text-lg">{{ batchPreviewItem.name }}</h3>
+                  <p class="text-white/60 text-xs">SVG 預覽</p>
+                </div>
+              </div>
+              
+              <button 
+                @click="closeBatchPreview" 
+                class="w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 backdrop-blur-sm flex items-center justify-center transition-colors shrink-0"
+              >
+                <X class="w-5 h-5 text-white" />
+              </button>
+            </div>
             
-            <!-- SVG Image -->
-            <div class="rounded-xl overflow-hidden bg-card shadow-2xl">
+            <!-- SVG Container -->
+            <div class="flex-1 relative rounded-xl overflow-hidden bg-gradient-to-br from-neutral-900 to-neutral-800 flex items-center justify-center p-8">
               <img 
                 :src="batchPreviewItem.previewUrl" 
                 :alt="batchPreviewItem.name"
-                class="max-w-full max-h-[75vh] object-contain p-4"
+                class="max-w-full max-h-full object-contain"
               />
-            </div>
-            
-            <!-- Info Bar -->
-            <div class="mt-3 flex items-center justify-between gap-4 px-1">
-              <!-- File Name -->
-              <div class="text-white text-sm font-medium truncate">
-                {{ batchPreviewItem.name }}
-              </div>
               
-              <!-- Size Info -->
-              <div class="flex items-center gap-2 shrink-0">
-                <div class="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/20 text-white">
-                  原始 {{ formatSize(batchPreviewItem.originalSize) }}
+              <!-- Floating Info Bar -->
+              <div class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/60 backdrop-blur-xl rounded-full px-6 py-3 border border-white/10 shadow-2xl">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-medium text-white/70">原始</span>
+                  <span class="text-sm font-mono text-white">{{ formatSize(batchPreviewItem.originalSize) }}</span>
                 </div>
-                <div class="px-3 py-1.5 rounded-lg text-xs font-medium bg-chart-2 text-white">
-                  優化後 {{ formatSize(batchPreviewItem.optimizedSize) }}
-                  <span class="ml-1 opacity-80">(-{{ batchPreviewItem.savings }}%)</span>
+                
+                <div class="w-px h-6 bg-white/20"></div>
+                
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-medium text-white/70">優化後</span>
+                  <span class="text-sm font-mono text-white">{{ formatSize(batchPreviewItem.optimizedSize) }}</span>
+                </div>
+                
+                <div v-if="batchPreviewItem.savings > 0" class="w-px h-6 bg-white/20"></div>
+                
+                <div v-if="batchPreviewItem.savings > 0" class="flex items-center gap-2">
+                  <span class="text-xs text-white/60">節省</span>
+                  <span class="text-xs font-bold px-2 py-1 rounded bg-green-500/20 text-green-400">
+                    -{{ Math.abs(batchPreviewItem.savings) }}%
+                  </span>
                 </div>
               </div>
             </div>
@@ -764,5 +821,19 @@ const batchTotalSavings = computed(() => {
 
 button {
   cursor: pointer;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground) / 0.2);
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--muted-foreground) / 0.4);
 }
 </style>

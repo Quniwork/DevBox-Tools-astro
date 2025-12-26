@@ -911,36 +911,59 @@ const closePreview = () => {
       <Transition name="modal">
         <div 
           v-if="previewItem" 
-          class="fixed inset-0 z-50 flex items-center justify-center p-4"
+          class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8"
           @click.self="closePreview"
         >
-          <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" @click="closePreview"></div>
+          <!-- Backdrop -->
+          <div class="absolute inset-0 bg-black/90 backdrop-blur-md" @click="closePreview"></div>
           
-          <div class="relative z-10 max-w-[90vw] max-h-[90vh] flex flex-col">
-            <button 
-              @click="closePreview"
-              class="absolute -top-10 right-0 text-white/70 hover:text-white transition-colors"
-            >
-              <X class="h-6 w-6" />
-            </button>
+          <!-- Modal Content -->
+          <div class="relative z-10 w-full h-full max-w-7xl flex flex-col">
+            <!-- Top Bar -->
+            <div class="flex items-center justify-between mb-4 px-2">
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="w-10 h-10 rounded-lg bg-white/10 backdrop-blur-sm flex items-center justify-center shrink-0">
+                  <Image class="w-5 h-5 text-white" />
+                </div>
+                <div class="min-w-0">
+                  <h3 class="text-white font-medium truncate text-lg">{{ previewItem.name }}</h3>
+                  <p v-if="previewItem.folder" class="text-white/60 text-xs truncate font-mono">{{ previewItem.folder }}</p>
+                </div>
+              </div>
+              
+              <button 
+                @click="closePreview" 
+                class="w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 backdrop-blur-sm flex items-center justify-center transition-colors shrink-0"
+              >
+                <X class="w-5 h-5 text-white" />
+              </button>
+            </div>
             
-            <div class="rounded-xl overflow-hidden bg-card shadow-2xl">
+            <!-- Image Container -->
+            <div class="flex-1 relative rounded-xl overflow-hidden bg-gradient-to-br from-neutral-900 to-neutral-800 flex items-center justify-center">
               <img 
                 :src="previewUrl" 
                 :alt="previewItem.name"
-                class="max-w-full max-h-[75vh] object-contain"
+                class="max-w-full max-h-full object-contain"
               />
-            </div>
-            
-            <div class="mt-3 flex items-center justify-between gap-4 px-1">
-              <div class="text-white text-sm font-medium truncate">
-                {{ previewItem.name }}
-              </div>
-              <div class="text-white/80 text-xs text-right">
-                {{ previewItem.status === 'done' ? '優化後預覽' : '原圖預覽' }}
-                <span class="ml-2 font-mono">
+              
+              <!-- Floating Info Bar -->
+              <div class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/60 backdrop-blur-xl rounded-full px-6 py-3 border border-white/10 shadow-2xl">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-medium text-white/70">{{ previewItem.status === 'done' ? '優化後' : '原圖' }}</span>
+                  <span class="text-sm font-mono text-white">
                     {{ formatSize(previewItem.status === 'done' && previewItem.optimizedSize ? previewItem.optimizedSize : previewItem.originalSize) }}
-                </span>
+                  </span>
+                </div>
+                
+                <div v-if="previewItem.status === 'done' && previewItem.optimizedSize" class="w-px h-6 bg-white/20"></div>
+                
+                <div v-if="previewItem.status === 'done' && previewItem.optimizedSize" class="flex items-center gap-2">
+                  <span class="text-xs text-white/60">節省</span>
+                  <span class="text-xs font-bold px-2 py-1 rounded bg-green-500/20 text-green-400">
+                    -{{ Math.round(((previewItem.originalSize - previewItem.optimizedSize) / previewItem.originalSize) * 100) }}%
+                  </span>
+                </div>
               </div>
             </div>
           </div>

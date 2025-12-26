@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { Card } from '@/components/ui/card';
+import CardContent from '@/components/ui/card/CardContent.vue';
 import Button from '@/components/ui/Button.vue';
 import ToolButton from '@/components/ui/ToolButton.vue';
-import DropZone from '@/components/ui/DropZone.vue';
-import { Upload, Download, Copy, Check, Link, QrCode, Image as ImageIcon, RefreshCw, Trash2, Clock } from 'lucide-vue-next';
+import { Upload, Download, Copy, Check, Link, QrCode, Image as ImageIcon, RefreshCw, Trash2, Clock, FolderSearch, X } from 'lucide-vue-next';
 import jsQR from 'jsqr';
 import QRCodeSVG from 'qrcode-svg';
 
@@ -118,6 +118,16 @@ const resultUrl = computed(() => {
 });
 
 // File handling
+const handleDragOver = (e: DragEvent) => {
+  e.preventDefault();
+  isDragging.value = true;
+};
+
+const handleDragLeave = (e: DragEvent) => {
+  e.preventDefault();
+  isDragging.value = false;
+};
+
 const handleDrop = (e: DragEvent) => {
   e.preventDefault();
   isDragging.value = false;
@@ -131,13 +141,6 @@ const handleFileSelect = (e: Event) => {
   const input = e.target as HTMLInputElement;
   if (input.files && input.files.length > 0) {
     processFile(input.files[0]);
-  }
-};
-
-// 處理 DropZone 傳入的檔案
-const handleDropZoneFiles = (files: FileList) => {
-  if (files.length > 0 && files[0].type.startsWith('image/')) {
-    processFile(files[0]);
   }
 };
 
@@ -288,27 +291,53 @@ const copySvg = async () => {
       <!-- Top Row: Left Upload, Right Result -->
       <div class="grid gap-6 lg:grid-cols-2">
         <!-- Left: Upload Zone -->
-        <DropZone
+        <Card
           v-if="!previewImage"
-          accept="image/*"
-          :multiple="false"
-          title="上傳 QR Code 圖片"
-          hint="支援 JPG、PNG、GIF、WebP"
-          @files="handleDropZoneFiles"
+          class="border-2 border-dashed transition-colors duration-200"
+          :class="isDragging ? 'border-primary bg-primary/5' : 'border-border bg-card'"
+          @dragenter="handleDragOver"
+          @dragover="handleDragOver"
+          @dragleave="handleDragLeave"
+          @drop="handleDrop"
         >
-          <template #icon>
-            <Upload class="h-6 w-6 text-muted-foreground" />
-          </template>
-        </DropZone>
+            <CardContent class="flex flex-col items-center justify-center py-12 text-center space-y-4">
+                <div class="p-4 bg-primary/10 rounded-full">
+                    <FolderSearch v-if="isDragging" class="w-10 h-10 text-primary" />
+                    <Upload v-else class="w-10 h-10 text-primary" />
+                </div>
+                <div class="space-y-2">
+                    <h3 class="text-xl font-semibold">上傳 QR Code 圖片</h3>
+                    <p class="text-sm text-muted-foreground max-w-sm mx-auto">
+                        拖曳圖片至此 或 點擊選擇<br/>
+                        <span class="text-xs opacity-70">支援 JPG、PNG、GIF、WebP</span>
+                    </p>
+                </div>
+                
+                <div class="flex gap-4">
+                    <div class="relative">
+                        <Button variant="default" class="cursor-pointer">
+                            選擇圖片
+                        </Button>
+                        <input 
+                            type="file" 
+                            accept="image/*"
+                            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            @change="handleFileSelect"
+                        />
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
 
         <!-- Preview Card -->
         <Card
           v-else
-          class="relative border-dashed border-[#88C0D0] bg-card p-8 cursor-pointer transition-all flex flex-col justify-center items-center"
+          class="relative border-dashed border-primary/50 bg-card p-8 cursor-pointer transition-all flex flex-col justify-center items-center group"
           @click="resetDecode"
         >
-          <img :src="previewImage" class="max-h-56 mx-auto rounded-lg" alt="QR Preview" />
-          <p class="text-xs text-muted-foreground mt-3">點擊重新上傳</p>
+          <img :src="previewImage" class="max-h-56 mx-auto rounded-lg shadow-sm" alt="QR Preview" />
+          <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center pointer-events-none"></div>
+          <p class="text-xs text-muted-foreground mt-3 group-hover:text-primary transition-colors">點擊重新上傳</p>
         </Card>
 
         <!-- Right: Decode Result -->
