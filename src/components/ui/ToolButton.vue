@@ -18,7 +18,7 @@ interface Props {
    * - clear: 清除按鈕 (ghost + Trash2 + 紅色 hover)
    * - download: 下載按鈕 (primary + Download 圖示)
    */
-  type: 'upload' | 'copy' | 'clear' | 'download';
+  type: 'upload' | 'copy' | 'clear' | 'download' | 'refresh';
   
   /** 按鈕文字 */
   label?: string;
@@ -66,7 +66,7 @@ const buttonVariant = computed(() => {
 });
 
 const buttonSize = computed(() => {
-  return props.type === 'clear' ? 'sm' : 'default';
+  return (props.type === 'clear' || props.type === 'refresh') ? 'sm' : 'default';
 });
 
 const buttonClass = computed(() => {
@@ -86,6 +86,9 @@ const buttonClass = computed(() => {
     case 'clear':
       classes.push('text-xs', 'text-muted-foreground', 'hover:text-destructive', 'transition-colors');
       break;
+    case 'refresh':
+      classes.push('text-xs', 'text-muted-foreground', 'hover:text-primary', 'transition-colors');
+      break;
     case 'download':
       if (props.variant === 'warning') {
         classes.push('bg-chart-2', 'text-white', 'hover:bg-chart-2/90');
@@ -104,6 +107,7 @@ const defaultLabels: Record<string, string> = {
   copy: '複製',
   clear: '清除全部',
   download: '下載',
+  refresh: '重新執行',
 };
 
 const displayLabel = computed(() => {
@@ -139,6 +143,9 @@ const displayLabel = computed(() => {
     <template v-else-if="type === 'download'">
       <RefreshCw v-if="loading" class="h-4 w-4 animate-spin" />
       <Download v-else class="h-4 w-4" />
+    </template>
+    <template v-else-if="type === 'refresh'">
+      <RefreshCw class="h-3.5 w-3.5" />
     </template>
     
     <!-- Slot 或預設標籤 -->

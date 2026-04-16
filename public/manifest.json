@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "DevBox - Developer Tools",
+  "version": "1.0.0",
+  "description": "All-in-one developer toolbox: Image Converter, Renamer, SVG Optimizer, and more.",
+  "icons": {
+    "16": "icon-16.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png"
+  },
+  "action": {
+    "default_icon": {
+      "16": "icon-16.png",
+      "48": "icon-48.png",
+      "128": "icon-128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+
+  "permissions": [
+    "storage",
+    "downloads"
+  ]
+}

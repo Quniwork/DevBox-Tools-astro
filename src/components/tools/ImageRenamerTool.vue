@@ -24,7 +24,8 @@ const CONFIG = {
     'live',
     'sports',
     'lottery',
-    'promotions'
+    'promotions',
+    'register'
   ]
 };
 
@@ -51,6 +52,11 @@ const dragIndex = ref<number | null>(null);
 const isDownloading = ref(false);
 const isDragOver = ref(false);
 const showCopied = ref(false);
+
+const replacingIndex = ref<number | null>(null);
+const replaceInputRef = ref<HTMLInputElement | null>(null);
+const dropTargetIndex = ref<number | null>(null);
+const sortTargetIndex = ref<number | null>(null);
 
 // ========================================
 // Initialization
@@ -147,6 +153,32 @@ const handleInput = (e: Event) => {
     input.value = '';
 };
 
+// Replace a single image
+const triggerReplace = (index: number) => {
+    replacingIndex.value = index;
+    replaceInputRef.value?.click();
+};
+
+const handleReplace = (e: Event) => {
+    const input = e.target as HTMLInputElement;
+    if (input.files && input.files.length > 0 && replacingIndex.value !== null) {
+        const file = input.files[0];
+        const idx = replacingIndex.value;
+        
+        // Revoke old URL
+        URL.revokeObjectURL(images.value[idx].previewUrl);
+        
+        // Update item while keeping suffix and other metadata
+        images.value[idx] = {
+            ...images.value[idx],
+            file,
+            previewUrl: URL.createObjectURL(file)
+        };
+    }
+    input.value = '';
+    replacingIndex.value = null;
+};
+
 // Drag & Drop
 const handleDragOverZone = (e: DragEvent) => {
     e.preventDefault();
@@ -186,18 +218,61 @@ const onDragStart = (e: DragEvent, index: number) => {
   }
 };
 
-const onDragOver = (e: DragEvent) => {
-  e.preventDefault(); // Necessary to allow dropping
+const onDragOver = (e: DragEvent, index?: number) => {
+  e.preventDefault();
+  
+  if (index === undefined) return;
+
+  // External Files (Replace mode)
+  if (e.dataTransfer?.types.includes('Files')) {
+    dropTargetIndex.value = index;
+    sortTargetIndex.value = null;
+  } 
+  // Internal Items (Sort mode)
+  else if (dragIndex.value !== null) {
+      sortTargetIndex.value = index;
+      dropTargetIndex.value = null;
+  }
+};
+
+const onDragLeave = (e: DragEvent) => {
+    // We don't nullify everything on every leave to avoid flickering
+    // It's better to manage it via the dragover of the next element or the end of drag
 };
 
 const onDrop = (e: DragEvent, index: number) => {
   e.preventDefault();
+  const isFiles = e.dataTransfer?.types.includes('Files');
+  
+  dropTargetIndex.value = null;
+  sortTargetIndex.value = null;
+
+  // Handle external file drop (Replacement)
+  if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      URL.revokeObjectURL(images.value[index].previewUrl);
+      images.value[index] = {
+          ...images.value[index],
+          file,
+          previewUrl: URL.createObjectURL(file)
+      };
+      return;
+  }
+
+  // Handle internal sort drop
   if (dragIndex.value !== null && dragIndex.value !== index) {
     const itemToMove = images.value[dragIndex.value];
     images.value.splice(dragIndex.value, 1);
     images.value.splice(index, 0, itemToMove);
   }
   dragIndex.value = null;
+  sortTargetIndex.value = null;
+};
+
+const onDragEnd = () => {
+    dragIndex.value = null;
+    sortTargetIndex.value = null;
+    dropTargetIndex.value = null;
 };
 
 // Dropdown handling
@@ -604,15 +679,35 @@ const getCanvasBlob = (img: HTMLImageElement, quality: number, scale: number = 1
             v-for="(img, index) in images"
             :key="img.id"
             class="group relative flex flex-col rounded-xl border bg-card text-card-foreground shadow-sm transition-all overflow-hidden"
-            :class="{ 'border-primary ring-2 ring-primary/20': dragIndex === index, 'hover:shadow-md hover:border-primary/50': dragIndex === null }"
+            :class="{ 
+                'ring-2 ring-primary border-primary z-10': dropTargetIndex === index,
+                'opacity-40 grayscale-[0.5] scale-95': dragIndex === index,
+                'border-primary/50 bg-primary/5 shadow-inner translate-y-1': sortTargetIndex === index && dragIndex !== index,
+                'hover:shadow-md hover:border-primary/30': dragIndex === null && dropTargetIndex === null && sortTargetIndex === null
+            }"
             draggable="true"
             @dragstart="onDragStart($event, index)"
-            @dragover="onDragOver"
+            @dragover="onDragOver($event, index)"
+            @dragleave="onDragLeave"
+            @dragend="onDragEnd"
             @drop="onDrop($event, index)"
         >
+            <!-- Sort Indicator Line -->
+            <div v-if="sortTargetIndex === index && dragIndex !== index" class="absolute inset-0 border-2 border-dashed border-primary/40 rounded-xl pointer-events-none"></div>
             <!-- Drag Handle & Remove -->
-            <div class="absolute right-2 top-2 z-20 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                    <button @click="removeImage(index)" class="rounded-full bg-background/80 p-1.5 text-destructive hover:bg-destructive hover:text-white backdrop-blur-sm shadow-sm transition-colors">
+            <div class="absolute right-2 top-2 z-20 flex gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+                <button 
+                  @click="triggerReplace(index)" 
+                  class="rounded-full bg-background/80 p-1.5 text-primary hover:bg-primary hover:text-white backdrop-blur-sm shadow-sm transition-colors"
+                  title="更換圖片"
+                >
+                    <RefreshCw class="h-3.5 w-3.5" />
+                </button>
+                <button 
+                  @click="removeImage(index)" 
+                  class="rounded-full bg-background/80 p-1.5 text-destructive hover:bg-destructive hover:text-white backdrop-blur-sm shadow-sm transition-colors"
+                  title="刪除圖片"
+                >
                     <X class="h-3.5 w-3.5" />
                 </button>
             </div>
@@ -632,6 +727,13 @@ const getCanvasBlob = (img: HTMLImageElement, quality: number, scale: number = 1
             <!-- Preview Image -->
             <div class="aspect-video w-full overflow-hidden bg-secondary relative">
                 <img :src="img.previewUrl" class="h-full w-full object-cover object-top" />
+                
+                <!-- Drop Overlay (External Files) -->
+                <div v-if="dropTargetIndex === index" class="absolute inset-0 bg-primary/20 backdrop-blur-[2px] flex items-center justify-center transition-all pointer-events-none">
+                    <div class="bg-primary text-white p-2 rounded-full shadow-lg scale-110 animate-bounce">
+                        <Upload class="w-5 h-5" />
+                    </div>
+                </div>
             </div>
 
             <!-- Controls -->
@@ -693,6 +795,15 @@ const getCanvasBlob = (img: HTMLImageElement, quality: number, scale: number = 1
 {{ generatedList || '尚未產生結果...' }}
          </div>
     </div>
+
+    <!-- Hidden input for single image replacement -->
+    <input
+        ref="replaceInputRef"
+        type="file"
+        accept="image/*"
+        class="hidden"
+        @change="handleReplace"
+    />
   </div>
 </template>
 

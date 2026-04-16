@@ -5,6 +5,7 @@ import { AlertCircle, CheckCircle2, FolderSearch, Loader2, RefreshCw, Upload, Do
 import Button from '@/components/ui/Button.vue';
 import ToolButton from '@/components/ui/ToolButton.vue';
 import JSZip from 'jszip';
+import UPNG from 'upng-js';
 
 // ========================================
 // Types
@@ -36,6 +37,15 @@ const isScanning = ref(false);
 const scannedFiles = ref<ScannedFile[]>([]);
 const dragActive = ref(false);
 const isCompressing = ref(false); // Global compressing state (for download packaging)
+
+// 品質預設
+type QualityPreset = 'high' | 'balanced' | 'low';
+const qualityPreset = ref<QualityPreset>('balanced');
+const QUALITY_MAP: Record<QualityPreset, { label: string; startQuality: number; desc: string }> = {
+    high:     { label: '高品質', startQuality: 0.9,  desc: '較大檔案，畫質最佳' },
+    balanced: { label: '平衡',   startQuality: 0.75, desc: '檔案大小與畫質平衡' },
+    low:      { label: '最小化', startQuality: 0.55, desc: '檔案最小，畫質較低' },
+};
 
 // Stats
 // Active files = Non-excluded files
@@ -240,10 +250,6 @@ const processFinalList = async (items: { file: File, path: string }[]) => {
 
 const processOptimization = async () => {
     const pendingFiles = scannedFiles.value.filter(f => f.status === 'pending');
-    
-    // Parallelize with limit? Or simple map. Simple map OK for client side usually.
-    // Let's do a sequence or chunk to be nice to UI thread.
-    
     for (const item of pendingFiles) {
         item.status = 'processing';
         try {
@@ -256,6 +262,17 @@ const processOptimization = async () => {
             item.status = 'error';
         }
     }
+};
+
+// 重新優化（切換品質後重跟）
+const reOptimize = async () => {
+    const targets = scannedFiles.value.filter(f => f.isOverLimit && !f.isExcluded);
+    for (const item of targets) {
+        item.status = 'pending';
+        item.optimizedBlob = undefined;
+        item.optimizedSize = undefined;
+    }
+    await processOptimization();
 };
 
 const clearAll = () => {
@@ -312,85 +329,105 @@ const fixAndDownload = async () => {
     }
 };
 
+
+// UPNG.js PNG 壓縮（cnum=0 無損 / cnum>0 有損調色盤壓縮）
+const UPNG_CNUM_MAP: Record<QualityPreset, number> = {
+    high:     0,   // cnum=0：真正無損，只優化 deflate
+    balanced: 256, // cnum=256：256 色調色盤（有損但畫質佳）
+    low:      64,  // cnum=64：64 色，最激進壓縮
+};
+
+const compressPng = async (file: File, cnum: number): Promise<Blob | null> => {
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        const decoded = UPNG.decode(arrayBuffer);
+        const encoded = UPNG.encode(
+            UPNG.toRGBA8(decoded),
+            decoded.width,
+            decoded.height,
+            cnum
+        );
+        return new Blob([encoded], { type: 'image/png' });
+    } catch (e) {
+        console.warn('UPNG compress failed:', e);
+        return null;
+    }
+};
+
 const convertToOptimizedBlob = async (file: File): Promise<Blob> => {
     const MAX_SIZE = LIMIT_SIZE_BYTES;
-    const type = file.type; // 'image/png' or 'image/jpeg'
-    
+    const outputType = file.type;
+    const isPng = outputType === 'image/png';
+    const preset = qualityPreset.value;
+
+    // ── PNG：用 UPNG 依品質等級壓縮 ──
+    if (isPng) {
+        const cnum = UPNG_CNUM_MAP[preset];
+        const blob = await compressPng(file, cnum);
+        if (blob && blob.size <= MAX_SIZE) return blob;
+
+        // 高品質（無損）壓不下來 → 直接保留原圖，不降級
+        if (preset === 'high') throw new Error('FILE_TOO_LARGE');
+
+        // 平衡/最小化 → 嘗試更低 cnum 繼續壓
+        const fallbackCnum = preset === 'balanced' ? 64 : 16;
+        const fallbackBlob = await compressPng(file, fallbackCnum);
+        if (fallbackBlob && fallbackBlob.size <= MAX_SIZE) return fallbackBlob;
+
+        throw new Error('FILE_TOO_LARGE');
+    }
+
+    // ── 非 PNG：canvas 品質循環 ──
     return new Promise((resolve, reject) => {
         const img = new Image();
         const url = URL.createObjectURL(file);
-        
+
         img.onload = async () => {
-             // 1. 初始嘗試：使用高品質
-             let quality = 0.9; 
-             let blob = await getCanvasBlob(img, quality, 1, type);
-             
-             // 2. 品質優化循環（適用於 JPG/WebP/PNG）
-             let attempts = 0;
-             while (blob && blob.size > MAX_SIZE && quality > 0.1 && attempts < 50) {
-                 quality -= 0.05;
-                 blob = await getCanvasBlob(img, quality, 1, type);
-                 attempts++;
-             }
-             
-             // 3. 縮放循環（如果品質降低仍無法達標）
-             if (blob && blob.size > MAX_SIZE) {
-                 quality = 0.8;
-                 let scale = 0.95;
-                 let scaledBlob = blob;
-                 attempts = 0;
-                  while (scaledBlob && scaledBlob.size > MAX_SIZE && scale > 0.3 && attempts < 50) {
-                     scaledBlob = await getCanvasBlob(img, quality, scale, type); 
-                     scale -= 0.05;
-                     attempts++;
-                 }
-                 blob = scaledBlob;
-             }
-             
-             // 最終檢查
-             if (blob && blob.size > MAX_SIZE) {
-                 reject(new Error('FILE_TOO_LARGE'));
-                 return;
-             }
-            
-            URL.revokeObjectURL(url);
-            if (blob) {
-                resolve(blob);
-            } else {
-                reject(new Error('Canvas to Blob failed'));
+            // 依照品質預設設定起始品質
+            let quality = QUALITY_MAP[qualityPreset.value].startQuality;
+            let blob = await getCanvasBlob(img, quality, outputType);
+            let attempts = 0;
+
+            while (blob && blob.size > MAX_SIZE && quality > 0.1 && attempts < 50) {
+                quality -= 0.05;
+                blob = await getCanvasBlob(img, quality, outputType);
+                attempts++;
             }
+
+            URL.revokeObjectURL(url);
+
+            if (!blob || blob.size > MAX_SIZE) {
+                reject(new Error('FILE_TOO_LARGE'));
+                return;
+            }
+            resolve(blob);
         };
-        
+
         img.onerror = () => {
             URL.revokeObjectURL(url);
             reject(new Error('Image conversion failed'));
         };
-        
+
         img.src = url;
     });
 };
 
-const getCanvasBlob = (img: HTMLImageElement, quality: number, scale: number = 1, type: string): Promise<Blob | null> => {
+const getCanvasBlob = (img: HTMLImageElement, quality: number, type: string): Promise<Blob | null> => {
     return new Promise((resolve) => {
         const canvas = document.createElement('canvas');
-        canvas.width = Math.floor(img.width * scale);
-        canvas.height = Math.floor(img.height * scale);
+        canvas.width = img.width;   // 保持原尺寸，不縮圖
+        canvas.height = img.height;
         const ctx = canvas.getContext('2d');
         if (!ctx) {
             resolve(null);
             return;
         }
-        
-        // 僅 JPG 需要白色背景（不支援透明）
-        if (type === 'image/jpeg') {
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-        }
-        
+
+        // 不填白色背景，保留透明通道
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        
+
         canvas.toBlob((blob) => {
             resolve(blob);
         }, type, quality);
@@ -424,8 +461,14 @@ const downloadUnoptimized = async () => {
 // Preview Modal Logic
 // ========================================
 const previewItem = ref<ScannedFile | null>(null);
-const previewUrl = ref<string>('');
+const originalUrl = ref<string>('');
+const optimizedUrl = ref<string>('');
 const isMounted = ref(false);
+
+// Before/After slider
+const sliderPct = ref(50); // 0~100
+const isDragging = ref(false);
+const sliderContainerRef = ref<HTMLElement | null>(null);
 
 onMounted(() => {
     isMounted.value = true;
@@ -433,18 +476,44 @@ onMounted(() => {
 
 const openPreview = (item: ScannedFile) => {
     previewItem.value = item;
-    // Show optimized if done, else original
-    const blob = (item.status === 'done' && item.optimizedBlob) ? item.optimizedBlob : item.file;
-    previewUrl.value = URL.createObjectURL(blob);
+    sliderPct.value = 50;
+    originalUrl.value = URL.createObjectURL(item.file);
+    optimizedUrl.value =
+        item.status === 'done' && item.optimizedBlob
+            ? URL.createObjectURL(item.optimizedBlob)
+            : '';
 };
 
 const closePreview = () => {
-    if (previewUrl.value) {
-        URL.revokeObjectURL(previewUrl.value);
-        previewUrl.value = '';
-    }
+    if (originalUrl.value) { URL.revokeObjectURL(originalUrl.value); originalUrl.value = ''; }
+    if (optimizedUrl.value) { URL.revokeObjectURL(optimizedUrl.value); optimizedUrl.value = ''; }
     previewItem.value = null;
+    isDragging.value = false;
 };
+
+const startDrag = (e: MouseEvent | TouchEvent) => {
+    isDragging.value = true;
+    updateSlider(e);
+};
+
+const onMove = (e: MouseEvent | TouchEvent) => {
+    if (!isDragging.value) return;
+    updateSlider(e);
+};
+
+const stopDrag = () => { isDragging.value = false; };
+
+const updateSlider = (e: MouseEvent | TouchEvent) => {
+    const el = sliderContainerRef.value;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
+    const pct = ((clientX - rect.left) / rect.width) * 100;
+    sliderPct.value = Math.min(100, Math.max(0, pct));
+};
+
+// 是否有 before/after 可以比較
+const hasComparison = computed(() => !!previewItem.value && previewItem.value.status === 'done' && !!previewItem.value.optimizedBlob);
 </script>
 
 <template>
@@ -558,13 +627,38 @@ const closePreview = () => {
             
             <!-- Right: Actions -->
             <div class="tool-action-right">
-                <ToolButton 
-                    type="clear" 
-                    @click="clearAll" 
+
+                <!-- 品質預設切換 -->
+                <div class="flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+                    <button
+                        v-for="(preset, key) in QUALITY_MAP"
+                        :key="key"
+                        :title="preset.desc"
+                        class="px-2.5 py-1 rounded-md text-xs font-medium transition-all"
+                        :class="qualityPreset === key
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-background'"
+                        @click="qualityPreset = key as QualityPreset"
+                    >
+                        {{ preset.label }}
+                    </button>
+                </div>
+
+                <!-- 重新優化按鈕 -->
+                <ToolButton
+                    v-if="scannedFiles.some(f => f.isOverLimit && !f.isExcluded)"
+                    type="refresh"
+                    label="重新優化"
+                    @click="reOptimize"
                 />
-                
+
+                <ToolButton
+                    type="clear"
+                    @click="clearAll"
+                />
+
                 <!-- Download Unoptimized Files Button -->
-                <ToolButton 
+                <ToolButton
                     v-if="scannedFiles.some(f => f.status === 'error')"
                     type="download"
                     label="下載未達標"
@@ -573,8 +667,8 @@ const closePreview = () => {
                 />
 
                 <!-- Download All Button -->
-                <ToolButton 
-                    type="download" 
+                <ToolButton
+                    type="download"
                     label="全部下載"
                     :loading="isCompressing"
                     @click="fixAndDownload"
@@ -744,14 +838,18 @@ const closePreview = () => {
     <!-- Preview Modal -->
     <Teleport v-if="isMounted" to="body">
       <Transition name="modal">
-        <div 
-          v-if="previewItem" 
+        <div
+          v-if="previewItem"
           class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8"
           @click.self="closePreview"
+          @mousemove="onMove"
+          @mouseup="stopDrag"
+          @touchmove.prevent="onMove"
+          @touchend="stopDrag"
         >
           <!-- Backdrop -->
           <div class="absolute inset-0 bg-black/90 backdrop-blur-md" @click="closePreview"></div>
-          
+
           <!-- Modal Content -->
           <div class="relative z-10 w-full h-full max-w-7xl flex flex-col">
             <!-- Top Bar -->
@@ -765,41 +863,75 @@ const closePreview = () => {
                   <p v-if="previewItem.folder" class="text-white/60 text-xs truncate font-mono">{{ previewItem.folder }}</p>
                 </div>
               </div>
-              
-              <button 
-                @click="closePreview" 
+
+              <button
+                @click="closePreview"
                 class="w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 backdrop-blur-sm flex items-center justify-center transition-colors shrink-0"
               >
                 <X class="w-5 h-5 text-white" />
               </button>
             </div>
-            
+
             <!-- Image Container -->
-            <div class="flex-1 relative rounded-xl overflow-hidden bg-gradient-to-br from-neutral-900 to-neutral-800 flex items-center justify-center">
-              <img 
-                :src="previewUrl" 
-                :alt="previewItem.name"
-                class="max-w-full max-h-full object-contain"
-              />
-              
-              <!-- Floating Info Bar -->
-              <div class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/60 backdrop-blur-xl rounded-full px-6 py-3 border border-white/10 shadow-2xl">
-                <div class="flex items-center gap-2">
-                  <span class="text-sm font-medium text-white/70">{{ previewItem.status === 'done' ? '優化後' : '原圖' }}</span>
-                  <span class="text-sm font-mono text-white">
-                    {{ formatSize(previewItem.status === 'done' && previewItem.optimizedSize ? previewItem.optimizedSize : previewItem.originalSize) }}
-                  </span>
+            <div
+              ref="sliderContainerRef"
+              class="flex-1 relative rounded-xl overflow-hidden bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%3E%3Crect%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23333%22%2F%3E%3Crect%20x%3D%228%22%20y%3D%228%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23333%22%2F%3E%3Crect%20x%3D%228%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23444%22%2F%3E%3Crect%20y%3D%228%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23444%22%2F%3E%3C%2Fsvg%3E')] select-none"
+              :class="hasComparison ? 'cursor-ew-resize' : ''"
+              @mousedown="hasComparison && startDrag($event)"
+              @touchstart.prevent="hasComparison && startDrag($event)"
+            >
+              <!-- 只有原圖（無優化版 or 壓縮失敗）-->
+              <template v-if="!hasComparison">
+                <img
+                  :src="originalUrl"
+                  :alt="previewItem.name"
+                  class="w-full h-full object-contain"
+                />
+              </template>
+
+              <!-- Before / After 比較 -->
+              <template v-else>
+                <!-- 右側：優化後（底層，全尺寸）-->
+                <img
+                  :src="optimizedUrl"
+                  :alt="previewItem.name + ' 優化後'"
+                  class="absolute inset-0 w-full h-full object-contain"
+                  draggable="false"
+                />
+
+                <!-- 左側：原圖（用 clip-path 裁切）-->
+                <img
+                  :src="originalUrl"
+                  :alt="previewItem.name + ' 原圖'"
+                  class="absolute inset-0 w-full h-full object-contain"
+                  :style="{ clipPath: `inset(0 ${100 - sliderPct}% 0 0)` }"
+                  draggable="false"
+                />
+
+                <!-- 分隔線 -->
+                <div
+                  class="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_8px_rgba(0,0,0,0.8)] pointer-events-none"
+                  :style="{ left: sliderPct + '%' }"
+                >
+                  <!-- 拖把手 -->
+                  <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white shadow-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-gray-700" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M7 4l-4 6 4 6M13 4l4 6-4 6" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </div>
                 </div>
-                
-                <div v-if="previewItem.status === 'done' && previewItem.optimizedSize" class="w-px h-6 bg-white/20"></div>
-                
-                <div v-if="previewItem.status === 'done' && previewItem.optimizedSize" class="flex items-center gap-2">
-                  <span class="text-xs text-white/60">節省</span>
-                  <span class="text-xs font-bold px-2 py-1 rounded bg-green-500/20 text-green-400">
-                    -{{ Math.round(((previewItem.originalSize - previewItem.optimizedSize) / previewItem.originalSize) * 100) }}%
-                  </span>
+
+                <!-- 左標：原圖 -->
+                <div class="absolute top-4 left-4 px-3 py-1 rounded-full bg-black/60 backdrop-blur text-white text-xs font-semibold pointer-events-none">
+                  原圖 · {{ formatSize(previewItem.originalSize) }}
                 </div>
-              </div>
+
+                <!-- 右標：優化後 -->
+                <div class="absolute top-4 right-4 px-3 py-1 rounded-full bg-black/60 backdrop-blur text-white text-xs font-semibold pointer-events-none">
+                  優化後 · {{ formatSize(previewItem.optimizedSize!) }}
+                  <span class="ml-1 text-green-400">-{{ Math.round(((previewItem.originalSize - previewItem.optimizedSize!) / previewItem.originalSize) * 100) }}%</span>
+                </div>
+              </template>
             </div>
           </div>
         </div>

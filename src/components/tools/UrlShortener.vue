@@ -38,11 +38,13 @@ const SERVICES: ShortenerService[] = [
     name: 'is.gd',
     domain: 'is.gd',
     fetchUrl: async (url: string) => {
-      const res = await fetch(`https://is.gd/create.php?format=simple&url=${encodeURIComponent(url)}`);
+      // is.gd 不支援 CORS，透過 corsproxy.io 代理繞過限制
+      const apiUrl = `https://is.gd/create.php?format=json&url=${encodeURIComponent(url)}`;
+      const res = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(apiUrl)}`);
       if (!res.ok) throw new Error('is.gd 請求失敗');
-      const result = await res.text();
-      if (!result.startsWith('http')) throw new Error('無法產生短網址');
-      return result;
+      const parsed = await res.json();
+      if (!parsed.shorturl) throw new Error(parsed.errormessage || '無法產生短網址');
+      return parsed.shorturl;
     }
   },
   {
@@ -50,11 +52,13 @@ const SERVICES: ShortenerService[] = [
     name: 'v.gd',
     domain: 'v.gd',
     fetchUrl: async (url: string) => {
-      const res = await fetch(`https://v.gd/create.php?format=simple&url=${encodeURIComponent(url)}`);
+      // v.gd 不支援 CORS，透過 corsproxy.io 代理繞過限制
+      const apiUrl = `https://v.gd/create.php?format=json&url=${encodeURIComponent(url)}`;
+      const res = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(apiUrl)}`);
       if (!res.ok) throw new Error('v.gd 請求失敗');
-      const result = await res.text();
-      if (!result.startsWith('http')) throw new Error('無法產生短網址');
-      return result;
+      const parsed = await res.json();
+      if (!parsed.shorturl) throw new Error(parsed.errormessage || '無法產生短網址');
+      return parsed.shorturl;
     }
   },
   {
