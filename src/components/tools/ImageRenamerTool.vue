@@ -51,8 +51,8 @@ const images = ref<ImageItem[]>([]);
 const dragIndex = ref<number | null>(null);
 const isDownloading = ref(false);
 const isDragOver = ref(false);
+const isScanning = ref(false);
 const showCopied = ref(false);
-
 const replacingIndex = ref<number | null>(null);
 const replaceInputRef = ref<HTMLInputElement | null>(null);
 const dropTargetIndex = ref<number | null>(null);
@@ -133,8 +133,18 @@ const closeSiteHistoryDelay = () => {
 // ========================================
 
 // Handle file uploads
-const handleFiles = (fileList: FileList) => {
-  const newImages: ImageItem[] = Array.from(fileList).map(file => ({
+const handleFiles = (files: File[]) => {
+  // 支援的圖片副檔名
+  const validExtensions = ['jpg', 'jpeg', 'png', 'webp', 'svg', 'gif', 'bmp'];
+  
+  // 過濾圖片：排除隱藏檔案，並檢查 MIME type 或 副檔名
+  const imageFiles = files.filter(f => {
+      if (f.name.startsWith('.')) return false; // 排除 .DS_Store 等
+      const ext = f.name.split('.').pop()?.toLowerCase() || '';
+      return f.type.startsWith('image/') || validExtensions.includes(ext);
+  });
+  
+  const newImages: ImageItem[] = imageFiles.map(file => ({
     id: crypto.randomUUID(),
     file,
     previewUrl: URL.createObjectURL(file),
@@ -148,7 +158,7 @@ const handleFiles = (fileList: FileList) => {
 const handleInput = (e: Event) => {
     const input = e.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {
-        handleFiles(input.files);
+        handleFiles(Array.from(input.files));
     }
     input.value = '';
 };
@@ -190,12 +200,46 @@ const handleDragLeaveZone = (e: DragEvent) => {
     isDragOver.value = false;
 };
 
-const handleDropZone = (e: DragEvent) => {
+const handleDropZone = async (e: DragEvent) => {
     e.preventDefault();
     isDragOver.value = false;
-    if (e.dataTransfer?.files) {
-        handleFiles(e.dataTransfer.files);
+    
+    const items = e.dataTransfer?.items;
+    if (!items) return;
+
+    isScanning.value = true;
+    const files: File[] = [];
+    const queue: FileSystemEntry[] = [];
+
+    for (let i = 0; i < items.length; i++) {
+        const entry = items[i].webkitGetAsEntry?.();
+        if (entry) queue.push(entry);
     }
+    
+    while (queue.length > 0) {
+        const entry = queue.shift()!;
+        if (entry.isFile) {
+            const file = await getFileFromEntry(entry as FileSystemFileEntry);
+            if (file) files.push(file);
+        } else if (entry.isDirectory) {
+            const subEntries = await readDir(entry as FileSystemDirectoryEntry);
+            queue.push(...subEntries);
+        }
+    }
+    
+    handleFiles(files);
+    isScanning.value = false;
+};
+
+const getFileFromEntry = (entry: FileSystemFileEntry): Promise<File> => {
+    return new Promise((resolve) => entry.file(resolve));
+};
+
+const readDir = (entry: FileSystemDirectoryEntry): Promise<FileSystemEntry[]> => {
+    return new Promise((resolve) => {
+        const reader = entry.createReader();
+        reader.readEntries((entries) => resolve(entries));
+    });
 };
 
 // Remove an image (and revoke URL)
@@ -332,7 +376,56 @@ const isOptionUsed = (opt: string, currentItemSuffix: string) => {
     return usedSuffixes.value.has(opt) && opt !== currentItemSuffix;
 };
 
+// 自動填入 Panel
+const isAutoFillOpen = ref(false);
+const checkedSuffixes = ref<string[]>([...CONFIG.SUFFIX_OPTIONS]);
+const autoFillBtnRef = ref<HTMLElement | null>(null);
+const autoFillPanelPos = ref({ top: 0, left: 0 });
+
+const openAutoFillPanel = () => {
+    if (!autoFillBtnRef.value) return;
+    const rect = autoFillBtnRef.value.getBoundingClientRect();
+    autoFillPanelPos.value = {
+        top: rect.bottom + window.scrollY + 6,
+        left: rect.left + window.scrollX,
+    };
+    isAutoFillOpen.value = true;
+};
+
+const closeAutoFillPanel = () => { isAutoFillOpen.value = false; };
+
+const toggleSuffix = (opt: string) => {
+    const idx = checkedSuffixes.value.indexOf(opt);
+    if (idx > -1) {
+        checkedSuffixes.value.splice(idx, 1);
+    } else {
+        // 插回原始順序
+        const originalIdx = CONFIG.SUFFIX_OPTIONS.indexOf(opt);
+        const insertAt = checkedSuffixes.value.findIndex(
+            s => CONFIG.SUFFIX_OPTIONS.indexOf(s) > originalIdx
+        );
+        if (insertAt === -1) {
+            checkedSuffixes.value.push(opt);
+        } else {
+            checkedSuffixes.value.splice(insertAt, 0, opt);
+        }
+    }
+};
+
+const isChecked = (opt: string) => checkedSuffixes.value.includes(opt);
+
+const autoFillSuffixes = () => {
+    if (checkedSuffixes.value.length === 0) return;
+    // 依照原始 SUFFIX_OPTIONS 順序過濾出勾選項目
+    const activeOptions = CONFIG.SUFFIX_OPTIONS.filter(opt => checkedSuffixes.value.includes(opt));
+    images.value.forEach((img, index) => {
+        img.suffix = activeOptions[index % activeOptions.length] ?? '';
+    });
+    isAutoFillOpen.value = false;
+};
+
 // Keyboard Navigation
+
 const handleKeyDown = (e: KeyboardEvent, item: ImageItem) => {
     if (!item.isDropdownOpen) {
         if (e.key === 'ArrowDown' || e.key === 'Enter') {
@@ -602,12 +695,12 @@ const getCanvasBlob = (img: HTMLImageElement, quality: number, scale: number = 1
             <div class="space-y-2">
                 <h3 class="tool-dropzone-title">圖片排序與命名</h3>
                 <p class="tool-dropzone-description">
-                    拖曳圖片至此 或 點擊選擇<br/>
+                    拖曳圖片或資料夾至此 或 點擊選擇<br/>
                     <span class="text-xs opacity-70">支援多選，自動轉為 JPG</span>
                 </p>
             </div>
             
-            <div class="flex gap-4">
+            <div class="flex flex-wrap justify-center gap-3">
                 <div class="relative">
                     <Button variant="default" class="cursor-pointer">
                         選擇圖片
@@ -615,10 +708,31 @@ const getCanvasBlob = (img: HTMLImageElement, quality: number, scale: number = 1
                     <input 
                         type="file" 
                         accept="image/*"
-                         multiple
+                        multiple
                         class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         @change="handleInput"
                     />
+                </div>
+                <div class="relative">
+                    <Button variant="outline" class="cursor-pointer gap-2">
+                        <FolderSearch class="w-4 h-4" />
+                        選擇資料夾
+                    </Button>
+                    <input 
+                        type="file" 
+                        webkitdirectory
+                        directory
+                        class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        @change="handleInput"
+                    />
+                </div>
+            </div>
+
+            <!-- Scanning State -->
+            <div v-if="isScanning" class="absolute inset-0 bg-background/60 backdrop-blur-sm flex items-center justify-center rounded-xl z-20">
+                <div class="flex flex-col items-center gap-3">
+                    <Loader2 class="w-8 h-8 animate-spin text-primary" />
+                    <p class="text-sm font-medium">正在掃描資料夾...</p>
                 </div>
             </div>
         </div>
@@ -644,11 +758,97 @@ const getCanvasBlob = (img: HTMLImageElement, quality: number, scale: number = 1
                     繼續上傳
                 </Button>
              </div>
+
+             <div class="relative group w-full sm:w-auto">
+                 <input
+                    type="file"
+                    webkitdirectory
+                    directory
+                    class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    @change="handleInput"
+                    title="上傳資料夾"
+                />
+                <Button 
+                    variant="outline" 
+                    class="w-full sm:w-auto gap-2"
+                >
+                    <FolderSearch class="h-4 w-4" />
+                    上傳資料夾
+                </Button>
+             </div>
              
              <div class="tool-action-separator"></div>
              
              <div class="flex items-center gap-2 text-sm">
                  <span class="font-medium">{{ images.length }} 張圖片</span>
+             </div>
+
+             <!-- 自動填入按鈕 + Dropdown -->
+             <div class="relative">
+                 <button
+                     ref="autoFillBtnRef"
+                     @click="isAutoFillOpen ? closeAutoFillPanel() : openAutoFillPanel()"
+                     class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all"
+                     :class="isAutoFillOpen
+                         ? 'border-primary bg-primary text-white'
+                         : 'border-primary/40 text-primary hover:bg-primary hover:text-white'"
+                     title="自動依序填入後綴"
+                 >
+                     <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                         <path d="M2 4h8M2 8h6M2 12h4" stroke-linecap="round"/>
+                         <path d="M11 7l3 3-3 3" stroke-linecap="round" stroke-linejoin="round"/>
+                     </svg>
+                     自動填入
+                 </button>
+
+                 <!-- Suffix 勾選 Panel (用 Teleport 避免被 overflow 截斷) -->
+                 <Teleport to="body">
+                     <div
+                         v-if="isAutoFillOpen"
+                         class="fixed z-[9999] w-52 rounded-xl border border-border bg-popover shadow-2xl p-3"
+                         :style="{ top: autoFillPanelPos.top + 'px', left: autoFillPanelPos.left + 'px' }"
+                     >
+                         <p class="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">勾選要填入的項目</p>
+
+                         <div class="max-h-52 overflow-y-auto space-y-0.5">
+                             <label
+                                 v-for="opt in CONFIG.SUFFIX_OPTIONS"
+                                 :key="opt"
+                                 class="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-accent/60 transition-colors select-none"
+                             >
+                                 <input
+                                     type="checkbox"
+                                     :checked="isChecked(opt)"
+                                     @change="toggleSuffix(opt)"
+                                     class="accent-primary w-3.5 h-3.5 cursor-pointer"
+                                 />
+                                 <span class="text-xs font-mono" :class="isChecked(opt) ? 'text-foreground' : 'text-muted-foreground line-through'">{{ opt }}</span>
+                             </label>
+                         </div>
+
+                         <div class="pt-2 mt-1 border-t border-border flex gap-2">
+                             <button
+                                 @click="autoFillSuffixes"
+                                 class="flex-1 py-1.5 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary/90 transition-colors"
+                             >
+                                 確認填入
+                             </button>
+                             <button
+                                 @click="closeAutoFillPanel"
+                                 class="px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:bg-accent transition-colors"
+                             >
+                                 取消
+                             </button>
+                         </div>
+                     </div>
+
+                     <!-- 點外部隔絕層 -->
+                     <div
+                         v-if="isAutoFillOpen"
+                         class="fixed inset-0 z-[9998]"
+                         @click="closeAutoFillPanel"
+                     />
+                 </Teleport>
              </div>
          </div>
          
