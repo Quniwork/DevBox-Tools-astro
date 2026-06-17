@@ -41,7 +41,17 @@ onMounted(() => {
 const loadHistory = () => {
   const stored = localStorage.getItem(CONFIG.HISTORY_KEY);
   if (stored) {
-    history.value = JSON.parse(stored);
+    try {
+      const parsed = JSON.parse(stored) as HistoryItem[];
+      // 依時間從新到舊安全排序
+      history.value = parsed.sort((a, b) => {
+        const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+        const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+        return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+      });
+    } catch (e) {
+      history.value = [];
+    }
   }
 };
 
@@ -57,6 +67,13 @@ const saveHistory = (originalPath: string, convertedPath: string, fromType: 'win
     convertedPath,
     timestamp: new Date().toISOString(),
     fromType,
+  });
+  
+  // 依時間從新到舊安全排序，確保順序正確
+  history.value.sort((a, b) => {
+    const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+    const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+    return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
   });
   
   // 限制數量
@@ -193,9 +210,10 @@ const copyHistoryPath = async (text: string, index: number, type: 'orig' | 'conv
 // 輔助函數
 // ========================================
 const formatTime = (timestamp: string) => {
+  if (!timestamp) return '剛剛';
   const date = new Date(timestamp);
   const now = new Date();
-  const diff = now.getTime() - date.getTime();
+  const diff = Math.max(0, now.getTime() - date.getTime());
   
   if (diff < 60000) return '剛剛';
   if (diff < 3600000) return `${Math.floor(diff / 60000)} 分鐘前`;
