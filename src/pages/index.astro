@@ -1,7 +1,7 @@
 ---
 import Layout from '@/layouts/Layout.astro';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Globe, FileImage, Palette, QrCode, ArrowRight, Terminal, Code, Image, Link, ListOrdered, FolderSearch } from 'lucide-vue-next';
+import { Globe, FileImage, Palette, QrCode, ArrowRight, Terminal, Code, Image, Link, ListOrdered, FolderSearch, FolderSync } from 'lucide-vue-next';
 import ThemeSwitcher from '@/components/ThemeSwitcher.vue';
 
 const tools = [
@@ -52,6 +52,12 @@ const tools = [
     description: "長網址轉換為短網址",
     icon: Link,
     href: "/tools/shortener.html"
+  },
+  {
+    title: "路徑轉換器",
+    description: "Windows 與 Mac 伺服器路徑互轉",
+    icon: FolderSync,
+    href: "/tools/path-converter.html"
   }
 ];
 ---

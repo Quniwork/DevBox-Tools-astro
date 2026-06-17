@@ -1,0 +1,12 @@
+---
+import ToolLayout from '@/layouts/ToolLayout.astro';
+import PathConverter from '@/components/tools/PathConverter.vue';
+---
+
+<ToolLayout title="路徑轉換器">
+  <PathConverter client:load />
+  
+  <p slot="footer" class="text-center text-xs text-muted-foreground mt-8">
+    Windows (Z:\) 與 Mac (/Volumes/CM1/) 路徑雙向互轉，資料完全在本地處理
+  </p>
+</ToolLayout>
