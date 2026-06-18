@@ -138,6 +138,22 @@ const performConversion = () => {
       result = '/Volumes/CM1/';
     }
     outputPath.value = result;
+  } else if (/^[\\/]?0共用/i.test(val)) {
+    // 支援企劃直接貼「0共用\...」相對路徑
+    let clean = val.replace(/^[\\/]+/, '');
+    if (clean.includes('\\')) {
+      detectedType.value = 'win';
+      // Win 相對路徑 -> Mac 完整路徑
+      let sub = clean.replace(/\\/g, '/');
+      let result = '/Volumes/CM1/行銷處/市場營銷部/' + sub;
+      outputPath.value = result.replace(/\/+/g, '/');
+    } else {
+      detectedType.value = 'mac';
+      // Mac 相對路徑 -> Win 完整路徑
+      let sub = clean.replace(/\//g, '\\');
+      let result = 'Z:\\行銷處\\市場營銷部\\' + sub;
+      outputPath.value = result.replace(/\\+/g, '\\');
+    }
   } else {
     // 非標準路徑，做單純的斜線/反斜線互轉
     if (val.includes('\\')) {
