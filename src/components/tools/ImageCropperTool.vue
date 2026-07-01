@@ -250,7 +250,11 @@ const getCropData = (item: CropperImageItem) => {
 
 const getVerticalText = (item: CropperImageItem) => {
   const data = getCropData(item);
-  const diff = data.cropTop - 118;
+  // 動態計算當前圖片完美置中時的 cropTop 基準值
+  const scaleY = item.naturalHeight / 130;
+  const centerTop = Math.round(15 * scaleY);
+  
+  const diff = data.cropTop - centerTop;
   if (diff < 0) {
     return `下裁 ${Math.abs(diff)}px`;
   } else if (diff > 0) {
@@ -262,7 +266,11 @@ const getVerticalText = (item: CropperImageItem) => {
 
 const getHorizontalText = (item: CropperImageItem) => {
   const data = getCropData(item);
-  const diff = data.cropLeft - 155;
+  // 動態計算當前圖片完美置中時的 cropLeft 基準值
+  const scaleX = item.naturalWidth / 169;
+  const centerLeft = Math.round(19.5 * scaleX);
+  
+  const diff = data.cropLeft - centerLeft;
   if (diff < 0) {
     return `右裁 ${Math.abs(diff)}px`;
   } else if (diff > 0) {
@@ -270,6 +278,18 @@ const getHorizontalText = (item: CropperImageItem) => {
   } else {
     return '水平置中';
   }
+};
+
+const copiedNameId = ref<string | null>(null);
+
+const copyFilename = async (item: CropperImageItem) => {
+  await navigator.clipboard.writeText(item.file.name);
+  copiedNameId.value = item.id;
+  setTimeout(() => {
+    if (copiedNameId.value === item.id) {
+      copiedNameId.value = null;
+    }
+  }, 1500);
 };
 
 // 批次數據格式化
@@ -281,9 +301,9 @@ const getHorizontalText = (item: CropperImageItem) => {
     <!-- Top Settings and Batch Operations Bar -->
     <Card class="border-border bg-card p-4">
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between w-full">
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2.5">
           <!-- 繼續上傳（支援拖放與點選） -->
-          <div class="relative group w-full sm:w-auto">
+          <div class="relative group w-full sm:w-auto" v-if="images.length > 0">
             <input 
               type="file" 
               multiple 
@@ -298,41 +318,37 @@ const getHorizontalText = (item: CropperImageItem) => {
               class="w-full sm:w-auto pointer-events-none"
             />
           </div>
-          <!-- 分隔線與數量 -->
-          <div class="h-4 w-[1px] hidden sm:block"></div>
-          <span class="text-xs font-medium text-muted-foreground">
+
+          <!-- 數量顯示 -->
+          <span class="text-xs font-medium text-muted-foreground px-1.5" v-if="images.length > 0">
             {{ images.length }} 張圖片
           </span>
 
-          <div class="h-4 w-[1px] bg-border hidden sm:block"></div>
+          <div class="h-4 w-[1px] bg-border hidden sm:block mr-0.5" v-if="images.length > 0"></div>
           <!-- 標題與說明 (常駐顯示) -->
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 mr-4 shrink-0">
             <Scissors class="h-4 w-4 text-primary" />
             <span class="text-sm font-medium text-foreground">圖片裁切參數助手 (目標尺寸: 1034x788)</span>
           </div>
         </div>
 
-        <!-- 列表不為空時的動作按鈕 -->
-        <div v-if="images.length > 0" class="flex flex-wrap items-center gap-3">
-          
+        <!-- 列表不為空時的動作按鈕 (緊隨標題並排，有圖片才顯示) -->
+        <div v-if="images.length > 0" class="flex flex-wrap items-center gap-2.5">
 
-          
+          <!-- 清空 -->
+          <ToolButton 
+            type="clear"
+            label="清空"
+            @click="clearAll"
+          />
 
-          <!-- 右側：清空與重設 -->
-          <div class="flex flex-wrap gap-2 w-full sm:w-auto">
-            <ToolButton 
-              type="clear"
-              label="清空"
-              class="flex-1 sm:flex-initial"
-              @click="clearAll"
-            />
-            <ToolButton 
-              type="refresh"
-              label="重設遮罩"
-              class="flex-1 sm:flex-initial"
-              @click="resetAllToCenter"
-            />
-          </div>
+          <!-- 重設所有置中 -->
+          <ToolButton 
+            type="refresh"
+            label="重設所有置中"
+            @click="resetAllToCenter"
+          />
+
         </div>
       </div>
     </Card>
@@ -421,8 +437,23 @@ const getHorizontalText = (item: CropperImageItem) => {
         <!-- Info and Results -->
         <div class="mt-4 flex-1 flex flex-col justify-between">
           <div>
-            <div class="text-xs font-semibold truncate text-foreground mb-1" :title="item.file.name">
-              {{ item.file.name }}
+            <div 
+              @click="copyFilename(item)"
+              class="text-xs font-semibold truncate cursor-pointer hover:text-primary transition-colors flex items-center justify-between group mb-1" 
+              :title="'點擊複製檔案名稱: ' + item.file.name"
+            >
+              <span 
+                class="truncate"
+                :class="copiedNameId === item.id ? 'text-chart-2 font-bold' : 'text-foreground'"
+              >
+                {{ item.file.name }}
+              </span>
+              <span 
+                v-if="copiedNameId === item.id" 
+                class="text-[9px] text-chart-2 font-medium shrink-0 flex items-center gap-0.5 ml-2"
+              >
+                <Check class="h-3 w-3" /> 已複製
+              </span>
             </div>
             
             <div class="text-[10px] text-muted-foreground mb-3 flex items-center justify-between">
@@ -454,12 +485,18 @@ const getHorizontalText = (item: CropperImageItem) => {
           <!-- Crop Offset Text (純文字顯示) -->
           <div class="mt-3.5 flex items-center justify-between text-xs text-muted-foreground border-t border-border/40 pt-3">
             <div class="flex-1 flex items-center justify-center gap-1.5">
-              <span class="font-semibold text-foreground px-2 py-0.5">
+              <span 
+                class="font-semibold px-2 py-0.5 transition-colors"
+                :class="getVerticalText(item) !== '垂直置中' ? 'text-amber-400 font-bold' : 'text-muted-foreground'"
+              >
                 {{ getVerticalText(item) }}
               </span>
             </div>
             <div class="flex-1 flex items-center justify-center gap-1.5">
-              <span class="font-semibold text-foreground px-2 py-0.5">
+              <span 
+                class="font-semibold px-2 py-0.5 transition-colors"
+                :class="getHorizontalText(item) !== '水平置中' ? 'text-amber-400 font-bold' : 'text-muted-foreground'"
+              >
                 {{ getHorizontalText(item) }}
               </span>
             </div>
